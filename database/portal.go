@@ -18,7 +18,11 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"time"
+
+	"github.com/medanisjbara/mautrix-imap/mail/types"
 
 	"maunium.net/go/mautrix/id"
 
@@ -31,14 +35,9 @@ type PortalKey struct {
 }
 
 func NewPortalKey(jid, receiver types.JID) PortalKey {
-	if jid.Server == types.GroupServer || jid.Server == types.NewsletterServer {
-		receiver = jid
-	} else if jid.Server == types.LegacyUserServer {
-		jid.Server = types.DefaultUserServer
-	}
 	return PortalKey{
-		JID:      jid.ToNonAD(),
-		Receiver: receiver.ToNonAD(),
+		JID:      jid,
+		Receiver: receiver,
 	}
 }
 
@@ -108,11 +107,11 @@ func (pq *PortalQuery) GetByMXID(ctx context.Context, mxid id.RoomID) (*Portal, 
 }
 
 func (pq *PortalQuery) GetAllByJID(ctx context.Context, jid types.JID) ([]*Portal, error) {
-	return pq.QueryMany(ctx, getPrivateChatsWithQuery, jid.ToNonAD())
+	return pq.QueryMany(ctx, getPrivateChatsWithQuery, jid)
 }
 
 func (pq *PortalQuery) FindPrivateChats(ctx context.Context, receiver types.JID) ([]*Portal, error) {
-	return pq.QueryMany(ctx, getPrivateChatsOfQuery, receiver.ToNonAD())
+	return pq.QueryMany(ctx, getPrivateChatsOfQuery, receiver)
 }
 
 func (pq *PortalQuery) GetAllByParentGroup(ctx context.Context, jid types.JID) ([]*Portal, error) {
@@ -120,7 +119,6 @@ func (pq *PortalQuery) GetAllByParentGroup(ctx context.Context, jid types.JID) (
 }
 
 func (pq *PortalQuery) FindPrivateChatsNotInSpace(ctx context.Context, receiver types.JID) (keys []PortalKey, err error) {
-	receiver = receiver.ToNonAD()
 	scanFn := func(rows dbutil.Scannable) (key PortalKey, err error) {
 		key.Receiver = receiver
 		err = rows.Scan(&key.JID)

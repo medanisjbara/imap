@@ -23,6 +23,8 @@ import (
 
 	"go.mau.fi/util/configupgrade"
 
+	"github.com/medanisjbara/mautrix-imap/mail/types"
+
 	"maunium.net/go/mautrix/bridge"
 	"maunium.net/go/mautrix/bridge/commands"
 	"maunium.net/go/mautrix/id"
@@ -55,6 +57,10 @@ type IMAPBridge struct {
 	managementRooms     map[id.RoomID]*User
 	managementRoomsLock sync.Mutex
 
+	portalsByMXID map[id.RoomID]*Portal
+	portalsByJID  map[database.PortalKey]*Portal
+	portalsLock   sync.Mutex
+
 	puppets             map[types.JID]*Puppet
 	puppetsByCustomMXID map[id.UserID]*Puppet
 	puppetsLock         sync.Mutex
@@ -72,21 +78,21 @@ func (br *IMAPBridge) Start() {
 		br.Provisioning.Init()
 	}
 	br.WaitWebsocketConnected()
-	go br.StartUsers()
+	// go br.StartUsers()
 
 	// NOTE: We might need to uncomment this
 	// go br.Loop()
 }
 
 func (br *IMAPBridge) Stop() {
-	br.Metrics.Stop()
+	// br.Metrics.Stop()
 	for _, user := range br.usersByAddress {
-		if user.Client == nil {
+		if user.Session == nil {
 			continue
 		}
 		user.zlog.Debug().Msg("Disconnecting user")
-		user.Client.Disconnect()
-		close(user.historySyncs)
+		user.Session.Disconnect()
+		// close(user.historySyncs)
 	}
 }
 
@@ -136,7 +142,6 @@ func main() {
 		Child: br,
 	}
 	br.InitVersion(Tag, Commit, BuildTime)
-	br.WAVersion = strings.FieldsFunc(br.Version, func(r rune) bool { return r == '-' || r == '+' })[0]
 
 	br.Main()
 }

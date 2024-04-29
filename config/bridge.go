@@ -23,6 +23,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/medanisjbara/mautrix-imap/mail/types"
+
 	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
@@ -62,7 +64,8 @@ type BridgeConfig struct {
 
 	Permissions bridgeconfig.PermissionConfig `yaml:"permissions"`
 
-	displaynameTemplate *template.Template `yaml:"-"`
+	ParsedUsernameTemplate *template.Template `yaml:"-"`
+	displaynameTemplate    *template.Template `yaml:"-"`
 }
 
 func (bc BridgeConfig) GetDoublePuppetConfig() bridgeconfig.DoublePuppetConfig {
@@ -137,26 +140,8 @@ func (bc *BridgeConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (bc BridgeConfig) FormatDisplayname(jid types.JID, contact types.ContactInfo) (string, int8) {
-	var buf strings.Builder
-	_ = bc.displaynameTemplate.Execute(&buf, legacyContactInfo{
-		ContactInfo: contact,
-		Notify:      contact.PushName,
-		VName:       contact.BusinessName,
-		Name:        contact.FullName,
-		Short:       contact.FirstName,
-		Phone:       "+" + jid.User,
-		JID:         "+" + jid.User,
-	})
-	var quality int8
-	switch {
-	case len(contact.PushName) > 0 || len(contact.BusinessName) > 0:
-		quality = NameQualityPush
-	case len(contact.FullName) > 0 || len(contact.FirstName) > 0:
-		quality = NameQualityContact
-	default:
-		quality = NameQualityPhone
-	}
-	return buf.String(), quality
+	// TODO Format the display name
+	return "mail-bot", 0
 }
 
 func (bc BridgeConfig) FormatUsername(username string) string {

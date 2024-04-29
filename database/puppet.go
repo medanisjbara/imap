@@ -18,9 +18,12 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/medanisjbara/mautrix-imap/mail/types"
+
 	"maunium.net/go/mautrix/id"
 
 	"go.mau.fi/util/dbutil"
@@ -101,12 +104,12 @@ func (puppet *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 	var displayname, avatar, avatarURL, customMXID, accessToken, nextBatch sql.NullString
 	var quality, lastSync sql.NullInt64
 	var enablePresence, enableReceipts, nameSet, avatarSet, contactInfoSet sql.NullBool
-	var username string
-	err := row.Scan(&username, &avatar, &avatarURL, &displayname, &quality, &nameSet, &avatarSet, &contactInfoSet, &lastSync, &customMXID, &accessToken, &nextBatch, &enablePresence, &enableReceipts)
+	var username, server string
+	err := row.Scan(&username, &server, &avatar, &avatarURL, &displayname, &quality, &nameSet, &avatarSet, &contactInfoSet, &lastSync, &customMXID, &accessToken, &nextBatch, &enablePresence, &enableReceipts)
 	if err != nil {
 		return nil, err
 	}
-	puppet.JID = types.NewJID(username, types.DefaultUserServer)
+	puppet.JID = types.NewJID(username, server)
 	puppet.Displayname = displayname.String
 	puppet.Avatar = avatar.String
 	puppet.AvatarURL, _ = id.ParseContentURI(avatarURL.String)
@@ -139,10 +142,6 @@ func (puppet *Puppet) sqlVariables() []any {
 }
 
 func (puppet *Puppet) Insert(ctx context.Context) error {
-	if puppet.JID.Server != types.DefaultUserServer {
-		zerolog.Ctx(ctx).Warn().Stringer("jid", puppet.JID).Msg("Not inserting puppet: not a user")
-		return nil
-	}
 	return puppet.qh.Exec(ctx, insertPuppetQuery, puppet.sqlVariables()...)
 }
 

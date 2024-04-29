@@ -18,9 +18,12 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/medanisjbara/mautrix-imap/mail/types"
 
 	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix/id"
@@ -102,6 +105,10 @@ func (mq *MessageQuery) GetMessagesBetween(ctx context.Context, chat PortalKey, 
 	return mq.QueryMany(ctx, getMessagesBetweenQuery, chat.JID, chat.Receiver, minTimestamp.Unix(), maxTimestamp.Unix())
 }
 
+type MessageType string
+
+type MessageErrorType string
+
 type Message struct {
 	qh *dbutil.QueryHelper[*Message]
 
@@ -117,12 +124,12 @@ const fakeGalleryMXIDFormat = "com.beeper.gallery::%d:%s"
 
 func (msg *Message) Scan(row dbutil.Scannable) (*Message, error) {
 	var ts int64
-	err := row.Scan(&msg.Chat.JID, &msg.Chat.Receiver, &msg.JID, &msg.MXID, &msg.Sender, &msg.SenderMXID, &ts, &msg.Sent, &msg.Type, &msg.Error, &msg.BroadcastListJID)
+	err := row.Scan(&msg.Chat.JID, &msg.Chat.Receiver, &msg.JID, &msg.MXID, &msg.Sender, &msg.SenderMXID, &ts)
 	if err != nil {
 		return nil, err
 	}
 	if strings.HasPrefix(msg.MXID.String(), "com.beeper.gallery::") {
-		_, err = fmt.Sscanf(msg.MXID.String(), fakeGalleryMXIDFormat, &msg.GalleryPart, &msg.MXID)
+		_, err = fmt.Sscanf(msg.MXID.String(), fakeGalleryMXIDFormat, &msg.MXID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse gallery MXID: %w", err)
 		}
@@ -135,10 +142,7 @@ func (msg *Message) Scan(row dbutil.Scannable) (*Message, error) {
 
 func (msg *Message) sqlVariables() []any {
 	mxid := msg.MXID.String()
-	if msg.GalleryPart != 0 {
-		mxid = fmt.Sprintf(fakeGalleryMXIDFormat, msg.GalleryPart, mxid)
-	}
-	return []any{msg.Chat.JID, msg.Chat.Receiver, msg.JID, mxid, msg.Sender, msg.SenderMXID, msg.Timestamp.Unix(), msg.Sent, msg.Type, msg.Error, msg.BroadcastListJID}
+	return []any{msg.Chat.JID, msg.Chat.Receiver, msg.JID, mxid, msg.Sender, msg.SenderMXID, msg.Timestamp.Unix()}
 }
 
 func (msg *Message) Insert(ctx context.Context) error {

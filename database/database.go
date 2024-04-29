@@ -18,16 +18,11 @@
 package database
 
 import (
-	"github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/util/dbutil"
 
 	"github.com/medanisjbara/mautrix-imap/database/upgrades"
 )
-
-func init() {
-	sqlstore.PostgresArrayWrapper = pq.Array
-}
 
 type Database struct {
 	*dbutil.Database
@@ -36,7 +31,6 @@ type Database struct {
 	Portal  *PortalQuery
 	Puppet  *PuppetQuery
 	Message *MessageQuery
-	Thread  *ThreadQuery
 }
 
 func New(db *dbutil.Database) *Database {
@@ -46,7 +40,6 @@ func New(db *dbutil.Database) *Database {
 		User:     &UserQuery{dbutil.MakeQueryHelper(db, newUser)},
 		Portal:   &PortalQuery{dbutil.MakeQueryHelper(db, newPortal)},
 		Puppet:   &PuppetQuery{dbutil.MakeQueryHelper(db, newPuppet)},
-		Thread:   &ThreadQuery{dbutil.MakeQueryHelper(db, newThread)},
 		Message:  &MessageQuery{dbutil.MakeQueryHelper(db, newMessage)},
 	}
 }

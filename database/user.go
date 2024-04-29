@@ -18,7 +18,12 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"sync"
+	"time"
+
+	"github.com/medanisjbara/mautrix-imap/mail/types"
 
 	"maunium.net/go/mautrix/id"
 
@@ -89,41 +94,35 @@ type User struct {
 }
 
 func (user *User) Scan(row dbutil.Scannable) (*User, error) {
-	var username, timezone sql.NullString
+	var username, server, timezone sql.NullString
 	var device, agent sql.NullInt16
-	var phoneLastSeen, phoneLastPinged sql.NullInt64
-	err := row.Scan(&user.MXID, &username, &agent, &device, &user.ManagementRoom, &user.SpaceRoom, &phoneLastSeen, &phoneLastPinged, &timezone)
+	err := row.Scan(&user.MXID, &username, &server, &agent, &device, &user.ManagementRoom, &user.SpaceRoom, &timezone)
 	if err != nil {
 		return nil, err
 	}
 	user.Timezone = timezone.String
 	if len(username.String) > 0 {
 		user.JID = types.JID{
-			User:   username.String,
-			Device: uint16(device.Int16),
-			Server: types.DefaultUserServer,
+			User: username.String,
+			// Device: uint16(device.Int16),
+			Server: server.String,
 		}
-	}
-	if phoneLastSeen.Valid {
-		user.PhoneLastSeen = time.Unix(phoneLastSeen.Int64, 0)
-	}
-	if phoneLastPinged.Valid {
-		user.PhoneLastPinged = time.Unix(phoneLastPinged.Int64, 0)
 	}
 	return user, nil
 }
 
 func (user *User) sqlVariables() []any {
 	var username *string
-	var agent, device *uint16
+	// var agent, device *uint16
+	var agent *uint16
 	if !user.JID.IsEmpty() {
 		username = dbutil.StrPtr(user.JID.User)
 		var zero uint16
 		agent = &zero
-		device = dbutil.NumPtr(user.JID.Device)
+		// device = dbutil.NumPtr(user.JID.Device)
 	}
 	return []any{
-		user.MXID, username, agent, device, user.ManagementRoom, user.SpaceRoom,
+		user.MXID, username, agent, user.ManagementRoom, user.SpaceRoom,
 		dbutil.UnixPtr(user.PhoneLastSeen), dbutil.UnixPtr(user.PhoneLastPinged),
 		user.Timezone,
 	}
