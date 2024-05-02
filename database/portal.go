@@ -15,6 +15,20 @@ const (
         FROM portal
     `
 	getAllPortalsWithMXIDQuery = portalBaseSelect + `WHERE mxid IS NOT NULL`
+	insertPortalQuery          = `
+        INSERT INTO portal (
+            thread_id, receiver, mxid, name, email_address, topic, avatar_path, avatar_hash, avatar_url,
+            name_set, avatar_set, topic_set, revision, encrypted, relay_user_id, expiration_time
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `
+	updatePortalQuery = `
+        UPDATE portal SET
+            mxid=$3, name=$4, email_address=$5, topic=$6, avatar_path=$7, avatar_hash=$8, avatar_url=$9,
+            name_set=$10, avatar_set=$11, topic_set=$12, revision=$13, encrypted=$14, relay_user_id=$15, expiration_time=$16
+        WHERE thread_id=$1 AND receiver=$2
+    `
+	deletePortalQuery = `DELETE FROM portal WHERE thread_id=$1 AND receiver=$2`
+	reIDPortalQuery   = `UPDATE portal SET thread_id=$2 WHERE thread_id=$1 AND receiver=$3`
 )
 
 type PortalKey struct {
@@ -74,4 +88,40 @@ func (p *Portal) Scan(row dbutil.Scannable) (*Portal, error) {
 	}
 	p.MXID = id.RoomID(mxid.String)
 	return p, nil
+}
+
+func (p *Portal) sqlVariables() []any {
+	return []any{
+		p.ThreadID,
+		p.Receiver,
+		dbutil.StrPtr(p.MXID),
+		p.Name,
+		p.Topic,
+		p.AvatarPath,
+		p.AvatarHash,
+		p.AvatarURL,
+		p.NameSet,
+		p.AvatarSet,
+		p.TopicSet,
+		p.Revision,
+		p.Encrypted,
+		p.RelayUserID,
+		p.ExpirationTime,
+	}
+}
+
+func (p *Portal) Insert(ctx context.Context) error {
+	return p.qh.Exec(ctx, insertPortalQuery, p.sqlVariables()...)
+}
+
+func (p *Portal) Update(ctx context.Context) error {
+	return p.qh.Exec(ctx, updatePortalQuery, p.sqlVariables()...)
+}
+
+func (p *Portal) Delete(ctx context.Context) error {
+	return p.qh.Exec(ctx, deletePortalQuery, p.ThreadID, p.Receiver)
+}
+
+func (p *Portal) ReID(ctx context.Context, newID string) error {
+	return p.qh.Exec(ctx, reIDPortalQuery, p.ThreadID, newID, p.Receiver)
 }
