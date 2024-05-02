@@ -34,11 +34,12 @@ type MyBridge struct {
 	Config *config.Config
 	DB     *database.Database
 
-	// Define other necessary components for your bridge here
+	portalsByMXID map[id.RoomID]*Portal
+	portalsByID   map[database.PortalKey]*Portal
+	portalsLock   sync.Mutex
 
 	// Mutexes for thread safety
 	usersLock sync.Mutex
-	// Add more mutexes if needed
 }
 
 var _ bridge.ChildOverride = (*MyBridge)(nil)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/rs/zerolog"
 
@@ -31,7 +32,7 @@ type Portal struct {
 	bridge *MyBridge
 	log    zerolog.Logger
 
-	emailMessage   chan portalEmailMessage
+	emailMessages  chan portalEmailMessage
 	matrixMessages chan portalMatrixMessage
 }
 
@@ -109,6 +110,10 @@ func (portal *Portal) HasRelaybot() bool {
 	return portal.bridge.Config.Bridge.Relay.Enabled && len(portal.RelayUserID) > 0
 }
 
+func (portal *Portal) getBridgeInfo() (string, string) {
+	return "", ""
+}
+
 // Bridge stuff related to Portals
 func (br *MyBridge) dbPortalsToPortals(dbPortals []*database.Portal, err error) ([]*Portal, error) {
 	if err != nil {
@@ -132,4 +137,60 @@ func (br *MyBridge) dbPortalsToPortals(dbPortals []*database.Portal, err error) 
 	}
 
 	return output, nil
+}
+
+func (br *MyBridge) loadPortal(ctx context.Context, dbPortal *database.Portal, key *database.PortalKey) *Portal {
+	if dbPortal == nil {
+		if key == nil {
+			return nil
+		}
+
+		dbPortal = br.DB.Portal.New()
+		dbPortal.PortalKey = *key
+		err := dbPortal.Insert(ctx)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to insert new portal")
+			return nil
+		}
+	}
+
+	portal := br.NewPortal(dbPortal)
+
+	br.portalsByID[portal.PortalKey] = portal
+	if portal.MXID != "" {
+		br.portalsByMXID[portal.MXID] = portal
+	}
+
+	return portal
+}
+
+func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
+
+	threadIDStr := strconv.FormatInt(dbPortal.ThreadID, 10)
+
+	log := br.ZLog.With().Str("thread_id", threadIDStr).Logger()
+
+	if dbPortal.MXID != "" {
+		log = log.With().Stringer("room_id", dbPortal.MXID).Logger()
+	}
+
+	portal := &Portal{
+		Portal: dbPortal,
+		bridge: br,
+		log:    log,
+
+		emailMessages:  make(chan portalEmailMessage, br.Config.Bridge.PortalMessageBuffer),
+		matrixMessages: make(chan portalMatrixMessage, br.Config.Bridge.PortalMessageBuffer),
+	}
+	portal.MsgConv = &msgconv.MessageConverter{
+		PortalMethods:        portal,
+		EmailFmtParams:       emailFormatParams,
+		MatrixFmtParams:      matrixFormatParams,
+		ConvertVoiceMessages: true,
+		MaxFileSize:          br.MediaConfig.UploadSize,
+		LocationFormat:       br.Config.Bridge.LocationFormat,
+	}
+	go portal.messageLoop()
+
+	return portal
 }
