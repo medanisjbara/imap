@@ -4,8 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+    "net/mail"
+    "context"
+
+    "maunium.net/go/mautrix/event"
 
 	"golang.org/x/exp/constraints"
+    "mybridge/pkg/emailmeow/types"
 )
 
 var (
@@ -39,4 +44,33 @@ func parseGeoURI(uri string) (lat, long string, err error) {
 		long = splitCoordinates[1]
 	}
 	return
+}
+
+func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent, ) (*types.EmailMessage, error) {
+	// Extract necessary information from the event and content
+	subject := "Your email subject here"
+	body := content.Body // Assuming it's plain text
+	to := []*mail.Address{
+		{
+			Name:    "Recipient Name",
+			Address: "recipient@example.com",
+		},
+	}
+	from := &mail.Address{
+		Name:    "Sender Name",
+		Address: "sender@example.com",
+	}
+
+	// Construct the email message
+	email := &types.EmailMessage{
+		Subject: subject,
+		Body:    body,
+		To:      to,
+		From:    from,
+		// Add more fields as needed
+	}
+
+	// Optionally, you can handle attachments here
+
+	return email, nil
 }

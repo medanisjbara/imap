@@ -1,6 +1,8 @@
 package msgconv
 
-import "context"
+import (
+    "context"
+)
 
 // PortalMethods defines methods for interacting with the bridge's portal.
 type PortalMethods interface {

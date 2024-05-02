@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"strconv"
-    "time"
-    "fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -13,10 +13,18 @@ import (
 	"maunium.net/go/mautrix/bridge"
 	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 
 	"mybridge/database"
 	"mybridge/msgconv"
 	"mybridge/pkg/emailmeow/events"
+)
+
+type msgconvContextKey int
+
+const (
+	msgconvContextKeyIntent msgconvContextKey = iota
+	msgconvContextKeyClient
 )
 
 type portalEmailMessage struct {
@@ -244,13 +252,13 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 		}
 	}
 
-	relaybotFormatted := isRelay && portal.addRelaybotFormat(ctx, realSenderMXID, evt, content)
+	// relaybotFormatted := isRelay && portal.addRelaybotFormat(ctx, realSenderMXID, evt, content)
 	if content.MsgType == event.MsgNotice && !portal.bridge.Config.Bridge.BridgeNotices {
 		go ms.sendMessageMetrics(evt, errMNoticeDisabled, "Error converting", true)
 		return
 	}
 	ctx = context.WithValue(ctx, msgconvContextKeyClient, sender.Client)
-	msg, err := portal.MsgConv.ToEmail(ctx, evt, content, relaybotFormatted)
+	msg, err := portal.MsgConv.ToEmail(ctx, evt, content)
 	if err != nil {
 		log.Err(err).Msg("Failed to convert message")
 		go ms.sendMessageMetrics(evt, err, "Error converting", true)
@@ -293,7 +301,7 @@ func (portal *Portal) handleEmailMessage(portalMessage portalEmailMessage) {
 	var msgType string
 	var timestamp uint64
 	switch typedEvt := portalMessage.evt.Event.(type) {
-    // FIXME
+	// FIXME
 	case *DataMessage:
 		msgType = "data"
 		timestamp = typedEvt.GetTimestamp()
@@ -321,6 +329,29 @@ func (portal *Portal) GetRelayUser() *User {
 		portal.relayUser = portal.bridge.GetUserByMXID(portal.RelayUserID)
 	}
 	return portal.relayUser
+}
+
+func (portal *Portal) addRelaybotFormat(ctx context.Context, userID id.UserID, evt *event.Event, content *event.MessageEventContent) bool {
+	member := portal.MainIntent().Member(ctx, portal.MXID, userID)
+	if member == nil {
+		member = &event.MemberEventContent{}
+	}
+	// Stickers can't have captions, so force them into images when relaying
+	if evt.Type == event.EventSticker {
+		content.MsgType = event.MsgImage
+		evt.Type = event.EventMessage
+	}
+	content.EnsureHasHTML()
+	data, err := portal.bridge.Config.Bridge.Relay.FormatMessage(content, userID, *member)
+	if err != nil {
+		portal.log.Err(err).Msg("Failed to apply relaybot format")
+	}
+	content.FormattedBody = data
+	// Force FileName field so the formatted body is used as a caption
+	if content.FileName == "" {
+		content.FileName = content.Body
+	}
+	return true
 }
 
 // Bridge stuff related to Portals
@@ -392,8 +423,8 @@ func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 		matrixMessages: make(chan portalMatrixMessage, br.Config.Bridge.PortalMessageBuffer),
 	}
 	portal.MsgConv = &msgconv.MessageConverter{
-		PortalMethods:        portal,
-		MaxFileSize:          br.MediaConfig.UploadSize,
+		PortalMethods: portal,
+		MaxFileSize:   br.MediaConfig.UploadSize,
 	}
 	go portal.messageLoop()
 

@@ -1,4 +1,3 @@
-// mautrix-signal - A Matrix-signal puppeting bridge.
 // Copyright (C) 2023 Scott Weber
 //
 // This program is free software: you can redistribute it and/or modify
@@ -33,7 +32,7 @@ import (
 )
 
 var (
-	errUserNotConnected            = errors.New("you are not connected to Signal")
+	errUserNotConnected            = errors.New("you are not connected to MyBridge")
 	errDifferentUser               = errors.New("user is not the recipient of this private chat portal")
 	errUserNotLoggedIn             = errors.New("user is not logged in and chat has no relay bot")
 	errRelaybotNotLoggedIn         = errors.New("neither user nor relay bot of chat are logged in")
