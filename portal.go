@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 
+	"github.com/rs/zerolog"
+
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/bridge"
+	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/event"
 	"mybridge/database"
 )
@@ -14,6 +17,10 @@ type Portal struct {
 	*database.Portal
 
 	bridge *MyBridge
+	log    zerolog.Logger
+
+	emailMessage   chan portalEmailMessage
+	matrixMessages chan portalMatrixMessage
 }
 
 func (portal *Portal) IsEncrypted() bool {
@@ -84,6 +91,10 @@ func (portal *Portal) UpdateBridgeInfo(ctx context.Context) {
 	if err != nil {
 		portal.log.Warn().Err(err).Msg("Failed to update uk.half-shot.bridge")
 	}
+}
+
+func (portal *Portal) HasRelaybot() bool {
+	return portal.bridge.Config.Bridge.Relay.Enabled && len(portal.RelayUserID) > 0
 }
 
 // Bridge stuff related to Portals
