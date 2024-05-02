@@ -15,7 +15,10 @@ import (
 type Database struct {
 	*dbutil.Database
 
-	// Define your database query structs here
+    User                *UserQuery
+    Portal              *PortalQuery
+    Puppet              *PuppetQuery
+    Message             *MessageQuery
 }
 
 func New(db *dbutil.Database) *Database {
