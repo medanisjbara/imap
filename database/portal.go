@@ -1,11 +1,22 @@
 package database
 
 import (
+    "context"
     "database/sql"
 
     "go.mau.fi/util/dbutil"
     "maunium.net/go/mautrix/id"
 )
+
+const (
+    portalBaseSelect = `
+        SELECT thread_id, receiver, mxid, name, topic, avatar_path, avatar_hash, avatar_url,
+               name_set, avatar_set, topic_set, revision, encrypted, relay_user_id, expiration_time
+        FROM portal
+    `
+    getAllPortalsWithMXIDQuery = portalBaseSelect + `WHERE mxid IS NOT NULL`
+)
+
 
 type PortalKey struct {
     ThreadID int64
@@ -33,6 +44,10 @@ type Portal struct {
     Encrypted      bool
     RelayUserID    id.UserID
     ExpirationTime uint32
+}
+
+func (pq *PortalQuery) GetAllWithMXID(ctx context.Context) ([]*Portal, error) {
+    return pq.QueryMany(ctx, getAllPortalsWithMXIDQuery)
 }
 
 func (p *Portal) Scan(row dbutil.Scannable) (*Portal, error) {
