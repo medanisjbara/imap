@@ -9,8 +9,20 @@ import (
 	"maunium.net/go/mautrix/bridge"
 	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/event"
+
 	"mybridge/database"
+	"mybridge/pkg/emailmeow/events"
 )
+
+type portalEmailMessage struct {
+	evt  *events.ChatEvent
+	user *User
+}
+
+type portalMatrixMessage struct {
+	evt  *event.Event
+	user *User
+}
 
 // Portal implementation
 type Portal struct {
