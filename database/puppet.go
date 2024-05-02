@@ -1,11 +1,11 @@
 package database
 
 import (
-    "time"
-    "database/sql"
+	"database/sql"
+	"time"
 
-    "go.mau.fi/util/dbutil"
-    "maunium.net/go/mautrix/id"
+	"go.mau.fi/util/dbutil"
+	"maunium.net/go/mautrix/id"
 )
 
 type PuppetQuery struct {
@@ -26,9 +26,8 @@ type Puppet struct {
 	ContactInfoSet   bool
 	ProfileFetchedAt time.Time
 
-	CustomMXID  id.UserID
+	CustomMXID id.UserID
 }
-
 
 func (p *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 	var customMXID sql.NullString
@@ -54,4 +53,3 @@ func (p *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 	}
 	return p, nil
 }
-

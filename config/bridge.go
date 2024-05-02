@@ -18,11 +18,10 @@ type BridgeConfig struct {
 	PortalMessageBuffer   int    `yaml:"portal_message_buffer"`
 	// Add more configuration fields as needed
 
-    DoublePuppetConfig bridgeconfig.DoublePuppetConfig `yaml:",inline"`
-    Encryption bridgeconfig.EncryptionConfig `yaml:"encryption"`
-    CommandPrefix         string
-    ManagementRoomText      bridgeconfig.ManagementRoomTexts `yaml:"management_room_text"`
-
+	DoublePuppetConfig bridgeconfig.DoublePuppetConfig `yaml:",inline"`
+	Encryption         bridgeconfig.EncryptionConfig   `yaml:"encryption"`
+	CommandPrefix      string
+	ManagementRoomText bridgeconfig.ManagementRoomTexts `yaml:"management_room_text"`
 
 	// Configuration for backfilling messages
 	Backfill struct {

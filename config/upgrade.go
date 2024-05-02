@@ -1,7 +1,6 @@
 package config
 
 import (
-
 	up "go.mau.fi/util/configupgrade"
 )
 

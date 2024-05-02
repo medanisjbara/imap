@@ -104,7 +104,7 @@ func main() {
 		ConfigUpgrader: &configupgrade.StructUpgrader{
 			// SimpleUpgrader: configupgrade.SimpleUpgrader(config.DoUpgrade),
 			// Blocks:         config.SpacedBlocks,
-			Base:           ExampleConfig,
+			Base: ExampleConfig,
 		},
 
 		Child: br,

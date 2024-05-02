@@ -1,29 +1,29 @@
 package database
 
 import (
-    "sync"
-    "database/sql"
+	"database/sql"
+	"sync"
 
-    "go.mau.fi/util/dbutil"
-    "maunium.net/go/mautrix/id"
+	"go.mau.fi/util/dbutil"
+	"maunium.net/go/mautrix/id"
 )
 
 type UserQuery struct {
-    *dbutil.QueryHelper[*User]
+	*dbutil.QueryHelper[*User]
 }
 
 type User struct {
-    qh *dbutil.QueryHelper[*User]
+	qh *dbutil.QueryHelper[*User]
 
-    MXID           id.UserID
-    EmailAddress   string
-    ManagementRoom id.RoomID
-    SpaceRoom      id.RoomID
+	MXID           id.UserID
+	EmailAddress   string
+	ManagementRoom id.RoomID
+	SpaceRoom      id.RoomID
 
-    lastReadCache     map[PortalKey]uint64
-    lastReadCacheLock sync.Mutex
-    inSpaceCache      map[PortalKey]bool
-    inSpaceCacheLock  sync.Mutex
+	lastReadCache     map[PortalKey]uint64
+	lastReadCacheLock sync.Mutex
+	inSpaceCache      map[PortalKey]bool
+	inSpaceCacheLock  sync.Mutex
 }
 
 func (u *User) Scan(row dbutil.Scannable) (*User, error) {
@@ -42,4 +42,3 @@ func (u *User) Scan(row dbutil.Scannable) (*User, error) {
 	u.SpaceRoom = id.RoomID(spaceRoom.String)
 	return u, nil
 }
-
