@@ -12,6 +12,7 @@ import (
 	"maunium.net/go/mautrix/event"
 
 	"mybridge/database"
+	"mybridge/msgconv"
 	"mybridge/pkg/emailmeow/events"
 )
 
@@ -28,6 +29,8 @@ type portalMatrixMessage struct {
 // Portal implementation
 type Portal struct {
 	*database.Portal
+
+	MsgConv *msgconv.MessageConverter
 
 	bridge *MyBridge
 	log    zerolog.Logger
@@ -184,11 +187,7 @@ func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 	}
 	portal.MsgConv = &msgconv.MessageConverter{
 		PortalMethods:        portal,
-		EmailFmtParams:       emailFormatParams,
-		MatrixFmtParams:      matrixFormatParams,
-		ConvertVoiceMessages: true,
 		MaxFileSize:          br.MediaConfig.UploadSize,
-		LocationFormat:       br.Config.Bridge.LocationFormat,
 	}
 	go portal.messageLoop()
 

@@ -11,7 +11,7 @@ type PortalMethods interface {
 type MessageConverter struct {
 	PortalMethods
 
-	// Add additional configuration parameters here.
+    MaxFileSize int64
 }
 
 // IsPrivateChat determines whether the conversation is a private chat.
