@@ -10,7 +10,7 @@ import (
 
 const (
 	portalBaseSelect = `
-        SELECT thread_id, receiver, mxid, name, topic, avatar_path, avatar_hash, avatar_url,
+        SELECT thread_id, receiver, mxid, name, email_address, topic, avatar_path, avatar_hash, avatar_url,
                name_set, avatar_set, topic_set, revision, encrypted, relay_user_id, expiration_time
         FROM portal
     `
@@ -32,6 +32,7 @@ type Portal struct {
 	PortalKey
 	MXID           id.RoomID
 	Name           string
+	EmailAddress   string
 	Topic          string
 	AvatarPath     string
 	AvatarHash     string

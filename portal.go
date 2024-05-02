@@ -12,6 +12,8 @@ import (
 // Portal implementation
 type Portal struct {
 	*database.Portal
+
+	bridge *MyBridge
 }
 
 func (portal *Portal) IsEncrypted() bool {
@@ -30,6 +32,13 @@ func (portal *Portal) MainIntent() *appservice.IntentAPI {
 	}
 
 	return portal.bridge.Bot
+}
+
+func (portal *Portal) GetDMPuppet() *Puppet {
+	if portal.EmailAddress == "" {
+		return nil
+	}
+	return portal.bridge.GetPuppetByEmailAddress(portal.EmailAddress)
 }
 
 func (portal *Portal) MarkEncrypted() {

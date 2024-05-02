@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.mau.fi/util/configupgrade"
 	flag "maunium.net/go/mauflag"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/bridge"
@@ -102,9 +103,9 @@ func main() {
 		Version:     "0.1.0",
 
 		ConfigUpgrader: &configupgrade.StructUpgrader{
-			// SimpleUpgrader: configupgrade.SimpleUpgrader(config.DoUpgrade),
-			// Blocks:         config.SpacedBlocks,
-			Base: ExampleConfig,
+			SimpleUpgrader: configupgrade.SimpleUpgrader(config.DoUpgrade),
+			Blocks:         config.SpacedBlocks,
+			Base:           ExampleConfig,
 		},
 
 		Child: br,
