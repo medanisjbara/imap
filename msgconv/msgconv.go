@@ -1,7 +1,7 @@
 package msgconv
 
 import (
-    "context"
+	"context"
 )
 
 // PortalMethods defines methods for interacting with the bridge's portal.
@@ -13,7 +13,7 @@ type PortalMethods interface {
 type MessageConverter struct {
 	PortalMethods
 
-    MaxFileSize int64
+	MaxFileSize int64
 }
 
 // IsPrivateChat determines whether the conversation is a private chat.

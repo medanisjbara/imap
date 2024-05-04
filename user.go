@@ -31,6 +31,33 @@ type User struct {
 	spaceCreateLock        sync.Mutex
 }
 
+func (br *MyBridge) GetUserByMXID(userID id.UserID) *User {
+	return br.maybeGetUserByMXID(userID, &userID)
+}
+
+func (br *MyBridge) GetUserByMXIDIfExists(userID id.UserID) *User {
+	return br.maybeGetUserByMXID(userID, nil)
+}
+
+func (br *MyBridge) maybeGetUserByMXID(userID id.UserID, userIDPtr *id.UserID) *User {
+	if userID == br.Bot.UserID || br.IsGhost(userID) {
+		return nil
+	}
+	br.usersLock.Lock()
+	defer br.usersLock.Unlock()
+
+	user, ok := br.usersByMXID[userID]
+	if !ok {
+		dbUser, err := br.DB.User.GetByMXID(context.TODO(), userID)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to get user from database")
+			return nil
+		}
+		return br.loadUser(context.TODO(), dbUser, userIDPtr)
+	}
+	return user
+}
+
 func (user *User) GetIDoublePuppet() bridge.DoublePuppet {
 	p := user.bridge.GetPuppetByCustomMXID(user.MXID)
 	if p == nil || p.CustomIntent() == nil {

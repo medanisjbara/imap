@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"net/mail"
 
 	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix/id"
@@ -46,7 +47,7 @@ type Portal struct {
 	PortalKey
 	MXID           id.RoomID
 	Name           string
-	EmailAddress   string
+	EmailAddress   mail.Address
 	Topic          string
 	AvatarPath     string
 	AvatarHash     string

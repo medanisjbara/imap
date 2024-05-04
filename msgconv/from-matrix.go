@@ -1,16 +1,16 @@
 package msgconv
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
-    "net/mail"
-    "context"
 
-    "maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/event"
 
 	"golang.org/x/exp/constraints"
-    "mybridge/pkg/emailmeow/types"
+	"mybridge/pkg/emailmeow/types"
 )
 
 var (
@@ -46,7 +46,7 @@ func parseGeoURI(uri string) (lat, long string, err error) {
 	return
 }
 
-func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent, ) (*types.EmailMessage, error) {
+func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent) (*types.EmailMessage, error) {
 	// Extract necessary information from the event and content
 	subject := "Your email subject here"
 	body := content.Body // Assuming it's plain text

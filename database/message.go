@@ -1,11 +1,11 @@
 package database
 
 import (
-    "context"
-    "strings"
-    "fmt"
+	"context"
+	"fmt"
+	"strings"
 
-    "github.com/lib/pq"
+	"github.com/lib/pq"
 	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix/id"
 )
@@ -13,62 +13,60 @@ import (
 // Queries
 // Message attrs: Sender, Timestamp, PartIndex, EmailAddress, EmailReceiver, MXID, RoomID,
 const (
-    getMessageByMXIDQuery = `
+	getMessageByMXIDQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE mxid=$1
     `
-    getMessagePartByEmailAddressQuery = `
+	getMessagePartByEmailAddressQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=$1 AND timestamp=$2 AND part_index=$3 AND email_receiver=$4
     `
-    getLastMessagePartByEmailAddressQuery = `
+	getLastMessagePartByEmailAddressQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=$1 AND timestamp=$2 AND email_receiver=$3
         ORDER BY part_index DESC LIMIT 1
     `
-    getAllMessagePartsByEmailAddressQuery = `
+	getAllMessagePartsByEmailAddressQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=$1 AND timestamp=$2 AND email_receiver=$3
     `
-    getMessageLastPartByEmailAddressWithUnknownReceiverQuery = `
+	getMessageLastPartByEmailAddressWithUnknownReceiverQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=$1 AND timestamp=$2 AND (email_receiver=$3 OR email_receiver='00000000-0000-0000-0000-000000000000')
         ORDER BY part_index DESC LIMIT 1
     `
-    getManyMessagesByEmailAddressQueryPostgres = `
+	getManyMessagesByEmailAddressQueryPostgres = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=$1 AND (email_receiver=$2 OR email_receiver=$3) AND timestamp=ANY($4)
         ORDER BY timestamp DESC, part_index DESC
     `
-    getManyMessagesByEmailAddressQuerySQLite = `
+	getManyMessagesByEmailAddressQuerySQLite = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE sender=?1 AND (email_receiver=?2 OR email_receiver=?3) AND timestamp IN (?4)
         ORDER BY timestamp DESC, part_index DESC
     `
-    getFirstBeforeQuery = `
+	getFirstBeforeQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE mx_room=$1 AND timestamp <= $2
         ORDER BY timestamp DESC
         LIMIT 1
     `
-    getMessagesBetweenTimeQuery = `
+	getMessagesBetweenTimeQuery = `
         SELECT sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room FROM message
         WHERE email_address=$1 AND email_receiver=$2 AND timestamp>$3 AND timestamp<=$4 AND part_index=0
         ORDER BY timestamp ASC
     `
-    insertMessageQuery = `
+	insertMessageQuery = `
         INSERT INTO message (sender, timestamp, part_index, email_address, email_receiver, mxid, mx_room)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
-    deleteMessageQuery = `
+	deleteMessageQuery = `
         DELETE FROM message
         WHERE sender=$1 AND timestamp=$2 AND part_index=$3 AND email_receiver=$4
     `
-    updateMessageTimestampQuery = `
+	updateMessageTimestampQuery = `
         UPDATE message SET timestamp=$4 WHERE sender=$1 AND timestamp=$2 AND email_receiver=$3
     `
-
-
 )
 
 // Message Query

@@ -10,3 +10,7 @@ type EmailMessage struct {
 	To      []*mail.Address
 	From    *mail.Address
 }
+
+func (e *EmailMessage) GetTimestamp() uint64 {
+	return 0
+}

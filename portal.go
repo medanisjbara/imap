@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,7 +18,7 @@ import (
 
 	"mybridge/database"
 	"mybridge/msgconv"
-	"mybridge/pkg/emailmeow/events"
+	"mybridge/pkg/emailmeow/types"
 )
 
 type msgconvContextKey int
@@ -28,7 +29,7 @@ const (
 )
 
 type portalEmailMessage struct {
-	evt  *events.ChatEvent
+	evt  any
 	user *User
 }
 
@@ -46,8 +47,12 @@ type Portal struct {
 	bridge *MyBridge
 	log    zerolog.Logger
 
+	encryptLock sync.Mutex
+
 	emailMessages  chan portalEmailMessage
 	matrixMessages chan portalMatrixMessage
+
+	relayUser *User
 }
 
 func (portal *Portal) IsEncrypted() bool {
@@ -216,8 +221,6 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 		return
 	}
 
-	realSenderMXID := sender.MXID
-	isRelay := false
 	if !sender.IsLoggedIn() {
 		sender = portal.GetRelayUser()
 		if sender == nil {
@@ -227,7 +230,6 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 			go ms.sendMessageMetrics(evt, errRelaybotNotLoggedIn, "Ignoring", true)
 			return
 		}
-		isRelay = true
 	}
 
 	var editTargetMsg *database.Message
@@ -280,9 +282,6 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 			}
 		} else {
 			portal.storeMessageInDB(ctx, evt.ID, sender.EmailAddress, msg.GetTimestamp(), 0)
-			if portal.ExpirationTime > 0 {
-				portal.addDisappearingMessage(ctx, evt.ID, uint32(portal.ExpirationTime), true)
-			}
 		}
 	}
 }
@@ -291,31 +290,44 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 type DataMessage string
 
 func (portal *Portal) handleEmailMessage(portalMessage portalEmailMessage) {
-	sender := portal.bridge.GetPuppetByEmailAddress(portalMessage.evt.Info.Sender)
-	if sender == nil {
-		portal.log.Warn().
-			Stringer("sender_id", portalMessage.evt.Info.Sender).
-			Msg("Couldn't get puppet for message")
-		return
-	}
-	var msgType string
-	var timestamp uint64
-	switch typedEvt := portalMessage.evt.Event.(type) {
-	// FIXME
-	case *DataMessage:
-		msgType = "data"
-		timestamp = typedEvt.GetTimestamp()
-		portal.handleEmailDataMessage(portalMessage.user, sender, typedEvt)
+	switch typedEvt := portalMessage.evt.(type) {
 	default:
 		portal.log.Error().
 			Type("data_type", typedEvt).
-			Msg("Invalid inner event type inside ChatEvent")
+			Msg("Invalid inner event type inside meta message")
 	}
-	portal.bridge.Metrics.TrackEmailMessage(time.UnixMilli(int64(timestamp)), msgType)
 }
 
 func (portal *Portal) sendMainIntentMessage(ctx context.Context, content *event.MessageEventContent) (*mautrix.RespSendEvent, error) {
 	return portal.sendMatrixEvent(ctx, portal.MainIntent(), event.EventMessage, content, nil, 0)
+}
+
+func (portal *Portal) encrypt(ctx context.Context, intent *appservice.IntentAPI, content *event.Content, eventType event.Type) (event.Type, error) {
+	if !portal.Encrypted || portal.bridge.Crypto == nil {
+		return eventType, nil
+	}
+	intent.AddDoublePuppetValue(content)
+	portal.encryptLock.Lock()
+	defer portal.encryptLock.Unlock()
+	err := portal.bridge.Crypto.Encrypt(ctx, portal.MXID, eventType, content)
+	if err != nil {
+		return eventType, fmt.Errorf("failed to encrypt event: %w", err)
+	}
+	return event.EventEncrypted, nil
+}
+
+func (portal *Portal) sendMatrixEvent(ctx context.Context, intent *appservice.IntentAPI, eventType event.Type, content any, extraContent map[string]any, timestamp int64) (*mautrix.RespSendEvent, error) {
+	wrappedContent := event.Content{Parsed: content, Raw: extraContent}
+	if eventType != event.EventReaction {
+		var err error
+		eventType, err = portal.encrypt(ctx, intent, &wrappedContent, eventType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, _ = intent.UserTyping(ctx, portal.MXID, false, 0)
+	return intent.SendMassagedMessageEvent(ctx, portal.MXID, eventType, &wrappedContent, timestamp)
 }
 
 func (portal *Portal) getBridgeInfoStateKey() string {
@@ -352,6 +364,47 @@ func (portal *Portal) addRelaybotFormat(ctx context.Context, userID id.UserID, e
 		content.FileName = content.Body
 	}
 	return true
+}
+
+func (portal *Portal) sendEmailMessage(ctx context.Context, msg *types.EmailMessage, sender *User, evtID id.EventID) error {
+	log := zerolog.Ctx(ctx).With().
+		Str("action", "send email message").
+		Stringer("event_id", evtID).
+		Str("portal_chat_id", string(portal.ThreadID)).
+		Logger()
+	ctx = log.WithContext(ctx)
+
+	log.Debug().Msg("Sending event to Email")
+
+	// Check to see if portal.ChatID is an email address
+	if portal.IsPrivateChat() {
+		// this is a 1:1 chat
+		err := sender.Client.SendEmail(ctx, portal.EmailAddress, msg)
+		if err != nil {
+			return err
+		}
+	} else {
+		// FIXME
+		return errors.New("sending to email groups not supported yet")
+	}
+
+	log.Debug().Msg("Email sent successfully")
+	return nil
+}
+
+func (portal *Portal) storeMessageInDB(ctx context.Context, eventID id.EventID, senderEmail string, timestamp uint64, partIndex int) {
+	dbMessage := portal.bridge.DB.Message.New()
+	dbMessage.MXID = eventID
+	dbMessage.RoomID = portal.MXID
+	dbMessage.Sender = senderEmail
+	dbMessage.Timestamp = timestamp
+	dbMessage.PartIndex = partIndex
+	dbMessage.ThreadID = portal.ChatID
+	dbMessage.EmailReceiver = portal.Receiver
+	err := dbMessage.Insert(ctx)
+	if err != nil {
+		portal.log.Err(err).Msg("Failed to insert message into database")
+	}
 }
 
 // Bridge stuff related to Portals
