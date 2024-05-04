@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/mail"
 	"os"
 	"sync"
 
@@ -40,6 +41,10 @@ type MyBridge struct {
 
 	// Mutexes for thread safety
 	usersLock sync.Mutex
+
+	puppets             map[mail.Address]*Puppet
+	puppetsByCustomMXID map[id.UserID]*Puppet
+	puppetsLock         sync.Mutex
 }
 
 var _ bridge.ChildOverride = (*MyBridge)(nil)

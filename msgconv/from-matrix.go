@@ -1,6 +1,7 @@
 package msgconv
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"maunium.net/go/mautrix/event"
 
 	"golang.org/x/exp/constraints"
-	"mybridge/pkg/emailmeow/types"
 )
 
 var (
@@ -46,31 +46,25 @@ func parseGeoURI(uri string) (lat, long string, err error) {
 	return
 }
 
-func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent) (*types.EmailMessage, error) {
-	// Extract necessary information from the event and content
-	subject := "Your email subject here"
-	body := content.Body // Assuming it's plain text
-	to := []*mail.Address{
-		{
-			Name:    "Recipient Name",
-			Address: "recipient@example.com",
-		},
-	}
-	from := &mail.Address{
-		Name:    "Sender Name",
-		Address: "sender@example.com",
+func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent) (*mail.Message, error) {
+	// FIXME
+	body := content.Body
+
+	from := "sender@example.com"
+	to := "recipient@example.com"
+	subject := "Test Email"
+
+	message := &mail.Message{
+		Header: mail.Header{},
+		Body:   bytes.NewBufferString(body),
 	}
 
-	// Construct the email message
-	email := &types.EmailMessage{
-		Subject: subject,
-		Body:    body,
-		To:      to,
-		From:    from,
-		// Add more fields as needed
+	message.Header["From"] = []string{from}
+	message.Header["To"] = []string{to}
+
+	if subject != "" {
+		message.Header["Subject"] = []string{subject}
 	}
 
-	// Optionally, you can handle attachments here
-
-	return email, nil
+	return message, nil
 }

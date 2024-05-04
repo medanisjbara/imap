@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/mail"
 	"strconv"
 	"sync"
 	"time"
@@ -18,7 +20,6 @@ import (
 
 	"mybridge/database"
 	"mybridge/msgconv"
-	"mybridge/pkg/emailmeow/types"
 )
 
 type msgconvContextKey int
@@ -74,7 +75,7 @@ func (portal *Portal) MainIntent() *appservice.IntentAPI {
 }
 
 func (portal *Portal) GetDMPuppet() *Puppet {
-	if portal.EmailAddress == "" {
+	if portal.EmailAddress.Address == "" {
 		return nil
 	}
 	return portal.bridge.GetPuppetByEmailAddress(portal.EmailAddress)
@@ -274,14 +275,21 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 
 	timings.totalSend = time.Since(start)
 	go ms.sendMessageMetrics(evt, err, "Error sending", true)
+
+	var timeStamp time.Time
+	timeStamp, err = msg.Header.Date()
+	if err != nil {
+		log.Err(err).Msg("Failed get message timestamp in database")
+	}
+
 	if err == nil {
 		if editTargetMsg != nil {
-			err = editTargetMsg.SetTimestamp(ctx, msg.GetTimestamp())
+			err = editTargetMsg.SetTimestamp(ctx, uint64(timeStamp.Unix()))
 			if err != nil {
 				log.Err(err).Msg("Failed to update message timestamp in database after editing")
 			}
 		} else {
-			portal.storeMessageInDB(ctx, evt.ID, sender.EmailAddress, msg.GetTimestamp(), 0)
+			portal.storeMessageInDB(ctx, evt.ID, sender.EmailAddress, uint64(timeStamp.Unix()), 0)
 		}
 	}
 }
@@ -366,7 +374,7 @@ func (portal *Portal) addRelaybotFormat(ctx context.Context, userID id.UserID, e
 	return true
 }
 
-func (portal *Portal) sendEmailMessage(ctx context.Context, msg *types.EmailMessage, sender *User, evtID id.EventID) error {
+func (portal *Portal) sendEmailMessage(ctx context.Context, msg *mail.Message, sender *User, evtID id.EventID) error {
 	log := zerolog.Ctx(ctx).With().
 		Str("action", "send email message").
 		Stringer("event_id", evtID).
@@ -379,7 +387,7 @@ func (portal *Portal) sendEmailMessage(ctx context.Context, msg *types.EmailMess
 	// Check to see if portal.ChatID is an email address
 	if portal.IsPrivateChat() {
 		// this is a 1:1 chat
-		err := sender.Client.SendEmail(ctx, portal.EmailAddress, msg)
+		err := sender.Client.SendEmail(ctx, &portal.EmailAddress, msg)
 		if err != nil {
 			return err
 		}
@@ -399,7 +407,7 @@ func (portal *Portal) storeMessageInDB(ctx context.Context, eventID id.EventID, 
 	dbMessage.Sender = senderEmail
 	dbMessage.Timestamp = timestamp
 	dbMessage.PartIndex = partIndex
-	dbMessage.ThreadID = portal.ChatID
+	dbMessage.ThreadID = portal.ThreadID
 	dbMessage.EmailReceiver = portal.Receiver
 	err := dbMessage.Insert(ctx)
 	if err != nil {
