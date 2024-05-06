@@ -75,7 +75,7 @@ func (portal *Portal) MainIntent() *appservice.IntentAPI {
 }
 
 func (portal *Portal) GetDMPuppet() *Puppet {
-	if portal.EmailAddress.Address == "" {
+	if portal.EmailAddress == "" {
 		return nil
 	}
 	return portal.bridge.GetPuppetByEmailAddress(portal.EmailAddress)
@@ -387,7 +387,11 @@ func (portal *Portal) sendEmailMessage(ctx context.Context, msg *mail.Message, s
 	// Check to see if portal.ChatID is an email address
 	if portal.IsPrivateChat() {
 		// this is a 1:1 chat
-		err := sender.Client.SendEmail(ctx, &portal.EmailAddress, msg)
+    address, err := mail.ParseAddress(portal.EmailAddress)
+		if err != nil {
+			return err
+		}
+		err = sender.Client.SendEmail(ctx, address, msg)
 		if err != nil {
 			return err
 		}
