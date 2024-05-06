@@ -42,7 +42,7 @@ type MyBridge struct {
 	// Mutexes for thread safety
 	usersLock sync.Mutex
 
-	puppets             map[mail.Address]*Puppet
+	puppets             map[string]*Puppet
 	puppetsByCustomMXID map[id.UserID]*Puppet
 	puppetsLock         sync.Mutex
 }

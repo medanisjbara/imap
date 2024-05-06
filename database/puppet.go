@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"net/mail"
 
 	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix/id"
@@ -36,8 +35,8 @@ type Puppet struct {
 	CustomMXID id.UserID
 }
 
-func (pq *PuppetQuery) GetByEmailAddress(ctx context.Context, email mail.Address) (*Puppet, error) {
-	return pq.QueryOne(ctx, getPuppetByMetaIDQuery, email.Address)
+func (pq *PuppetQuery) GetByEmailAddress(ctx context.Context, email string) (*Puppet, error) {
+	return pq.QueryOne(ctx, getPuppetByMetaIDQuery, email)
 }
 
 func (pq *PuppetQuery) GetByCustomMXID(ctx context.Context, mxid id.UserID) (*Puppet, error) {

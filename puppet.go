@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/mail"
 	"regexp"
 
@@ -37,9 +38,9 @@ func (br *MyBridge) GetPuppetByMXID(mxid id.UserID) *Puppet {
 	return br.GetPuppetByEmailAddress(emailAddr)
 }
 
-func (br *MyBridge) GetPuppetByEmailAddress(addr mail.Address) *Puppet {
+func (br *MyBridge) GetPuppetByEmailAddress(addr string) *Puppet {
 	// FIXME
-	if addr.Address == "" {
+	if addr == "" {
 		br.ZLog.Warn().Msg("Trying to get puppet with empty email_address")
 		return nil
 	}
@@ -54,19 +55,19 @@ func (br *MyBridge) GetPuppetByEmailAddress(addr mail.Address) *Puppet {
 			br.ZLog.Err(err).Msg("Failed to get puppet from database")
 			return nil
 		}
-		return br.loadPuppet(context.TODO(), dbPuppet, &addr)
+		return br.loadPuppet(context.TODO(), dbPuppet, addr)
 	}
 	return puppet
 }
 
 var userIDRegex *regexp.Regexp
 
-func ParseFromRFC5322(addrr string) string {
+func ParseFromRFC5322(addrr string) (string, error) {
 	// FIXME
-	return "Barry Gibbs <bg@example.com>"
+	return "Barry Gibbs <bg@example.com>", nil
 }
 
-func (br *MyBridge) ParsePuppetMXID(mxid id.UserID) (mail.Address, bool) {
+func (br *MyBridge) ParsePuppetMXID(mxid id.UserID) (string, bool) {
 	if userIDRegex == nil {
 		pattern := fmt.Sprintf(
 			"^@%s:%s$",
@@ -80,15 +81,37 @@ func (br *MyBridge) ParsePuppetMXID(mxid id.UserID) (mail.Address, bool) {
 	if len(match) == 2 {
 		parsedRFC5322, err := ParseFromRFC5322(match[1])
 		if err != nil {
-			return 0, false
+			return "", false
 		}
 
-		parsed, err := mail.Address.ParseAddress(parsedRFC5322)
+		parsed, err := mail.ParseAddress(parsedRFC5322)
 		if err != nil {
-			return 0, false
+			return "", false
 		}
-		return parsed, true
+		return parsed.Address, true
 	}
 
-	return 0, false
+	return "", false
+}
+
+func (br *MyBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, email string) *Puppet {
+	if dbPuppet == nil {
+		if email == "" {
+			return nil
+		}
+		dbPuppet = br.DB.Puppet.New()
+		dbPuppet.EmailAddress = email
+		err := dbPuppet.Insert(ctx)
+		if err != nil {
+			br.ZLog.Error().Err(err).Int64("email_address", string).Msg("Failed to insert new puppet")
+			return nil
+		}
+	}
+
+	puppet := br.NewPuppet(dbPuppet)
+	br.puppets[puppet.EmailAddress] = puppet
+	if puppet.CustomMXID != "" {
+		br.puppetsByCustomMXID[puppet.CustomMXID] = puppet
+	}
+	return puppet
 }
