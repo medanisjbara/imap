@@ -5,6 +5,7 @@ import (
 
 	"go.mau.fi/util/configupgrade"
 	"maunium.net/go/mautrix/bridge"
+	"maunium.net/go/mautrix/bridge/commands"
 	"maunium.net/go/mautrix/id"
 
 	"mybridge/config"
@@ -56,12 +57,19 @@ func (br *MyBridge) GetConfigPtr() interface{} {
 }
 
 func (br *MyBridge) Init() {
-	// Initialize your bridge components here
 	br.DB = database.New(br.Bridge.DB)
-	// Initialize other components
+
+	br.CommandProcessor = commands.NewProcessor(&br.Bridge)
+	br.RegisterCommands()
+
+	ss := br.Config.Bridge.Provisioning.SharedSecret
+	if len(ss) > 0 && ss != "disable" {
+		// br.provisioning = &ProvisioningAPI{bridge: br, log: br.ZLog.With().Str("component", "provisioning").Logger()}
+	}
 }
 
 func (br *MyBridge) Start() {
+
 	// Start your bridge here
 }
 
