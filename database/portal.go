@@ -32,8 +32,8 @@ const (
 )
 
 type PortalKey struct {
-	ThreadID int64
-	Receiver int64
+	ThreadID string
+	Receiver string
 }
 
 type PortalQuery struct {

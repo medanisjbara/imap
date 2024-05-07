@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
-	"strconv"
 	"sync"
 	"time"
 
@@ -339,7 +338,7 @@ func (portal *Portal) sendMatrixEvent(ctx context.Context, intent *appservice.In
 }
 
 func (portal *Portal) getBridgeInfoStateKey() string {
-	return fmt.Sprintf("net.maunium.mybridge://bridge/%s", portal.ThreadID)
+	return fmt.Sprintf("net.maunium.mybridge://bridge/%v", portal.ThreadID)
 }
 
 func (portal *Portal) GetRelayUser() *User {
@@ -378,7 +377,7 @@ func (portal *Portal) sendEmailMessage(ctx context.Context, msg *mail.Message, s
 	log := zerolog.Ctx(ctx).With().
 		Str("action", "send email message").
 		Stringer("event_id", evtID).
-		Str("portal_chat_id", string(portal.ThreadID)).
+		Str("portal_chat_id", portal.ThreadID).
 		Logger()
 	ctx = log.WithContext(ctx)
 
@@ -471,9 +470,7 @@ func (br *MyBridge) loadPortal(ctx context.Context, dbPortal *database.Portal, k
 
 func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 
-	threadIDStr := strconv.FormatInt(dbPortal.ThreadID, 10)
-
-	log := br.ZLog.With().Str("thread_id", threadIDStr).Logger()
+	log := br.ZLog.With().Str("thread_id", dbPortal.ThreadID).Logger()
 
 	if dbPortal.MXID != "" {
 		log = log.With().Stringer("room_id", dbPortal.MXID).Logger()

@@ -132,14 +132,14 @@ func (mq *MessageQuery) GetManyByEmailAddress(ctx context.Context, sender string
 type Message struct {
 	qh *dbutil.QueryHelper[*Message]
 
-	ThreadID int64
+	ThreadID string
 
 	Sender    string
 	Timestamp uint64
 	PartIndex int
 
-	EmailAddress  int64
-	EmailReceiver int64
+	EmailAddress  string
+	EmailReceiver string
 
 	MXID   id.EventID
 	RoomID id.RoomID
