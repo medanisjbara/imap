@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	getUserByMXIDQuery         = `SELECT mxid, email_address, management_room, space_room FROM "user" WHERE mxid=$1`
-	getUserByEmailAddressQuery = `SELECT mxid, email_address, management_room, space_room FROM "user" WHERE email_address=$1`
-	getAllLoggedInUsersQuery   = `SELECT mxid, email_address, management_room, space_room FROM "user" WHERE cookies IS NOT NULL`
-	insertUserQuery            = `INSERT INTO "user" (mxid, email_address, management_room, space_room) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	updateUserQuery            = `UPDATE "user" SET meta_id=$2, wa_device_id=$3, cookies=$4, inbox_fetched=$5, management_room=$6, space_room=$7 WHERE mxid=$1`
+	getUserBaseQuery           = `SELECT mxid, email_address, password, management_room, space_room FROM "user"`
+	getUserByMXIDQuery         = getUserBaseQuery + `WHERE mxid=$1`
+	getUserByEmailAddressQuery = getUserBaseQuery + `WHERE email_address=$1`
+	getAllLoggedInUsersQuery   = getUserBaseQuery + `WHERE email_address IS NOT NULL`
+	insertUserQuery            = `INSERT INTO "user" (mxid, email_address, password, management_room, space_room) VALUES ($1, $2, $3, $4, $5)`
+	updateUserQuery            = `UPDATE "user" SET email_address=$2, password=$3, management_room=$4, space_room=$5 WHERE mxid=$1`
 )
 
 type UserQuery struct {
@@ -37,6 +38,7 @@ type User struct {
 
 	MXID           id.UserID
 	EmailAddress   string
+	Password       string
 	ManagementRoom id.RoomID
 	SpaceRoom      id.RoomID
 }

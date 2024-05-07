@@ -159,3 +159,30 @@ func (br *MyBridge) GetPuppetByCustomMXID(mxid id.UserID) *Puppet {
 	}
 	return puppet
 }
+
+func (br *MyBridge) GetAllPuppetsWithCustomMXID() []*Puppet {
+	puppets, err := br.DB.Puppet.GetAllWithCustomMXID(context.TODO())
+	if err != nil {
+		br.ZLog.Error().Err(err).Msg("Failed to get all puppets with custom MXID")
+		return nil
+	}
+	return br.dbPuppetsToPuppets(puppets)
+}
+
+func (br *MyBridge) dbPuppetsToPuppets(dbPuppets []*database.Puppet) []*Puppet {
+	br.puppetsLock.Lock()
+	defer br.puppetsLock.Unlock()
+
+	output := make([]*Puppet, len(dbPuppets))
+	for index, dbPuppet := range dbPuppets {
+		if dbPuppet == nil {
+			continue
+		}
+		puppet, ok := br.puppets[dbPuppet.EmailAddress]
+		if !ok {
+			puppet = br.loadPuppet(context.TODO(), dbPuppet, "")
+		}
+		output[index] = puppet
+	}
+	return output
+}

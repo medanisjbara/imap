@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 
 	"go.mau.fi/util/configupgrade"
@@ -64,41 +65,46 @@ func (br *MyBridge) Init() {
 
 	ss := br.Config.Bridge.Provisioning.SharedSecret
 	if len(ss) > 0 && ss != "disable" {
-		// br.provisioning = &ProvisioningAPI{bridge: br, log: br.ZLog.With().Str("component", "provisioning").Logger()}
+		// TODO: br.provisioning = &ProvisioningAPI{bridge: br, log: br.ZLog.With().Str("component", "provisioning").Logger()}
 	}
 }
 
 func (br *MyBridge) Start() {
-
-	// Start your bridge here
+	go br.StartUsers()
 }
 
 func (br *MyBridge) Stop() {
 	// Stop your bridge here
+	fmt.Println("Stop")
 }
 
 func (br *MyBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
 	// Implement your portal retrieval logic here
+	fmt.Println("Get Portal")
 	return nil
 }
 
 func (br *MyBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
 	// Implement your user retrieval logic here
+	fmt.Println("Get I User")
 	return nil
 }
 
 func (br *MyBridge) IsGhost(mxid id.UserID) bool {
 	// Implement your ghost checking logic here
+	fmt.Println("Is Ghost")
 	return false
 }
 
 func (br *MyBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
 	// Implement your ghost retrieval logic here
+	fmt.Println("Is I Ghost")
 	return nil
 }
 
 func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User, brGhost bridge.Ghost) {
 	// Implement your private portal creation logic here
+	fmt.Println("Create Private Portal")
 }
 
 func main() {
