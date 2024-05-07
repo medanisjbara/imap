@@ -1,20 +1,10 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"net/mail"
-	"os"
 	"sync"
 
-	"github.com/rs/zerolog"
 	"go.mau.fi/util/configupgrade"
-	flag "maunium.net/go/mauflag"
-	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/bridge"
-	"maunium.net/go/mautrix/bridge/commands"
-	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
 
 	"mybridge/config"
@@ -35,12 +25,16 @@ type MyBridge struct {
 	Config *config.Config
 	DB     *database.Database
 
+	usersByMXID         map[id.UserID]*User
+	usersByEmailAddress map[string]*User
+	usersLock           sync.Mutex
+
+	managementRooms     map[id.RoomID]*User
+	managementRoomsLock sync.Mutex
+
 	portalsByMXID map[id.RoomID]*Portal
 	portalsByID   map[database.PortalKey]*Portal
 	portalsLock   sync.Mutex
-
-	// Mutexes for thread safety
-	usersLock sync.Mutex
 
 	puppets             map[string]*Puppet
 	puppetsByCustomMXID map[id.UserID]*Puppet

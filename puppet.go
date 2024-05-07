@@ -6,10 +6,11 @@ import (
 	"net/mail"
 	"regexp"
 
+	"mybridge/database"
+
 	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/id"
-	"mybridge/database"
 )
 
 type Puppet struct {
@@ -22,6 +23,16 @@ type Puppet struct {
 
 	customIntent *appservice.IntentAPI
 	customUser   *User
+}
+
+// CustomIntent implements bridge.Ghost.
+func (*Puppet) CustomIntent() *appservice.IntentAPI {
+	panic("unimplemented")
+}
+
+// GetMXID implements bridge.Ghost.
+func (*Puppet) GetMXID() id.UserID {
+	panic("unimplemented")
 }
 
 func (puppet *Puppet) DefaultIntent() *appservice.IntentAPI {
@@ -58,6 +69,23 @@ func (br *MyBridge) GetPuppetByEmailAddress(addr string) *Puppet {
 		return br.loadPuppet(context.TODO(), dbPuppet, addr)
 	}
 	return puppet
+}
+
+func (br *MyBridge) NewPuppet(dbPuppet *database.Puppet) *Puppet {
+	return &Puppet{
+		Puppet: dbPuppet,
+		bridge: br,
+		log:    br.ZLog.With().Str("user_id", dbPuppet.EmailAddress).Logger(),
+
+		MXID: br.FormatPuppetMXID(dbPuppet.EmailAddress),
+	}
+}
+
+func (br *MyBridge) FormatPuppetMXID(emailAddr string) id.UserID {
+	return id.NewUserID(
+		br.Config.Bridge.FormatUsername(emailAddr),
+		br.Config.Homeserver.Domain,
+	)
 }
 
 var userIDRegex *regexp.Regexp
@@ -103,7 +131,7 @@ func (br *MyBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, e
 		dbPuppet.EmailAddress = email
 		err := dbPuppet.Insert(ctx)
 		if err != nil {
-			br.ZLog.Error().Err(err).Int64("email_address", string).Msg("Failed to insert new puppet")
+			br.ZLog.Error().Err(err).Str("email_address", email).Msg("Failed to insert new puppet")
 			return nil
 		}
 	}
@@ -112,6 +140,22 @@ func (br *MyBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, e
 	br.puppets[puppet.EmailAddress] = puppet
 	if puppet.CustomMXID != "" {
 		br.puppetsByCustomMXID[puppet.CustomMXID] = puppet
+	}
+	return puppet
+}
+
+func (br *MyBridge) GetPuppetByCustomMXID(mxid id.UserID) *Puppet {
+	br.puppetsLock.Lock()
+	defer br.puppetsLock.Unlock()
+
+	puppet, ok := br.puppetsByCustomMXID[mxid]
+	if !ok {
+		dbPuppet, err := br.DB.Puppet.GetByCustomMXID(context.TODO(), mxid)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to get puppet from database")
+			return nil
+		}
+		return br.loadPuppet(context.TODO(), dbPuppet, "")
 	}
 	return puppet
 }

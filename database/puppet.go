@@ -9,16 +9,16 @@ import (
 )
 
 const (
-	puppetBaseSelect           = `SELECT email_address, name, custom_mxid FROM puppet`
+	puppetBaseSelect           = `SELECT email_address, name, custom_mxid, access_token FROM puppet`
 	getPuppetByMetaIDQuery     = puppetBaseSelect + `WHERE id=$1`
 	getPuppetByCustomMXIDQuery = puppetBaseSelect + `WHERE custom_mxid=$1`
 	getPuppetsWithCustomMXID   = puppetBaseSelect + `WHERE custom_mxid<>''`
-	updatePuppetQuery          = `UPDATE puppet SET name=$2, custom_mxid=$3 WHERE email_address=$1`
+	updatePuppetQuery          = `UPDATE puppet SET name=$2, custom_mxid=$3, access_token=$4 WHERE email_address=$1`
 	insertPuppetQuery          = `
 		INSERT INTO puppet (
-            email_address, name, custom_mxid
+            email_address, name, custom_mxi, access_tokend
 		)
-		VALUES ($1, $2, $3)
+		VALUES ($1, $2, $3, $4)
 	`
 )
 
@@ -32,7 +32,8 @@ type Puppet struct {
 	EmailAddress string
 	Name         string
 
-	CustomMXID id.UserID
+	CustomMXID  id.UserID
+	AccessToken string
 }
 
 func (pq *PuppetQuery) GetByEmailAddress(ctx context.Context, email string) (*Puppet, error) {
@@ -59,4 +60,20 @@ func (p *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 	}
 	p.CustomMXID = id.UserID(customMXID.String)
 	return p, nil
+}
+
+func (p *Puppet) sqlVariables() []any {
+	return []any{
+		p.Name,
+		p.EmailAddress,
+		dbutil.StrPtr(p.CustomMXID),
+	}
+}
+
+func (p *Puppet) Insert(ctx context.Context) error {
+	return p.qh.Exec(ctx, insertPortalQuery, p.sqlVariables()...)
+}
+
+func (p *Puppet) Update(ctx context.Context) error {
+	return p.qh.Exec(ctx, updatePortalQuery, p.sqlVariables()...)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sync"
 
 	"mybridge/database"
@@ -31,6 +32,15 @@ type User struct {
 	spaceCreateLock        sync.Mutex
 }
 
+func (user *User) GetRemoteID() string {
+	return user.EmailAddress
+}
+
+func (user *User) GetRemoteName() string {
+	// FIXME
+	return user.EmailAddress
+}
+
 func (br *MyBridge) GetUserByMXID(userID id.UserID) *User {
 	return br.maybeGetUserByMXID(userID, &userID)
 }
@@ -59,11 +69,8 @@ func (br *MyBridge) maybeGetUserByMXID(userID id.UserID, userIDPtr *id.UserID) *
 }
 
 func (user *User) GetIDoublePuppet() bridge.DoublePuppet {
-	p := user.bridge.GetPuppetByCustomMXID(user.MXID)
-	if p == nil || p.CustomIntent() == nil {
-		return nil
-	}
-	return p
+	// TODO
+	return nil
 }
 
 func (user *User) GetIGhost() bridge.Ghost {
@@ -112,4 +119,44 @@ func (user *User) SetManagementRoom(roomID id.RoomID) {
 	if err != nil {
 		user.log.Error().Err(err).Msg("Error setting management room")
 	}
+}
+
+func (br *MyBridge) loadUser(ctx context.Context, dbUser *database.User, mxid *id.UserID) *User {
+	if dbUser == nil {
+		if mxid == nil {
+			return nil
+		}
+		dbUser = br.DB.User.New()
+		dbUser.MXID = *mxid
+		err := dbUser.Insert(ctx)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Error creating user %s")
+			return nil
+		}
+	}
+
+	user := br.NewUser(dbUser)
+	br.usersByMXID[user.MXID] = user
+	if user.EmailAddress != "" {
+		br.usersByEmailAddress[user.EmailAddress] = user
+	}
+	if user.ManagementRoom != "" {
+		br.managementRoomsLock.Lock()
+		br.managementRooms[user.ManagementRoom] = user
+		br.managementRoomsLock.Unlock()
+	}
+	return user
+}
+
+func (br *MyBridge) NewUser(dbUser *database.User) *User {
+	user := &User{
+		User:   dbUser,
+		bridge: br,
+		log:    br.ZLog.With().Stringer("user_id", dbUser.MXID).Logger(),
+
+		PermissionLevel: br.Config.Bridge.Permissions.Get(dbUser.MXID),
+	}
+	user.Admin = user.PermissionLevel >= bridgeconfig.PermissionLevelAdmin
+	user.BridgeState = br.NewBridgeStateQueue(user)
+	return user
 }
