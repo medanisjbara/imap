@@ -1,4 +1,4 @@
--- v0 -> v20 (compatible with v17+): Latest revision
+-- v0 -> v1: Latest revision
 
 
 -- TODO: Add email_address
@@ -26,7 +26,7 @@ CREATE TABLE portal (
 );
 
 CREATE TABLE puppet (
-    email_address uuid    PRIMARY KEY,
+    email_address TEXT    PRIMARY KEY,
     number        TEXT    UNIQUE,
     name          TEXT    NOT NULL,
     name_quality  INTEGER NOT NULL,
@@ -48,12 +48,12 @@ CREATE TABLE puppet (
 
 CREATE TABLE "user" (
     mxid  TEXT PRIMARY KEY,
-    email_address  uuid,
+    email_address  TEXT,
 
     management_room TEXT,
     space_room      TEXT,
 
-    CONSTRAINT user_uuid_unique UNIQUE(uuid)
+    CONSTRAINT user_address_unique UNIQUE(email_address)
 );
 
 CREATE TABLE user_portal (
@@ -71,7 +71,7 @@ CREATE TABLE user_portal (
 );
 
 CREATE TABLE message (
-    sender     uuid    NOT NULL,
+    sender     TEXT    NOT NULL,
     timestamp  BIGINT  NOT NULL,
     part_index INTEGER NOT NULL,
 
@@ -82,7 +82,7 @@ CREATE TABLE message (
     mx_room TEXT NOT NULL,
 
     PRIMARY KEY (sender, timestamp, part_index, email_receiver),
-    CONSTRAINT message_portal_fkey FOREIGN KEY (email_address, signal_receiver)
+    CONSTRAINT message_portal_fkey FOREIGN KEY (email_address, email_receiver)
         REFERENCES portal(thread_id, receiver) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (sender) REFERENCES puppet(email_address) ON DELETE CASCADE,
     CONSTRAINT message_mxid_unique UNIQUE (mxid)

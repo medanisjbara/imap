@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"sync"
 
@@ -13,6 +14,7 @@ import (
 	"mybridge/database"
 )
 
+//go:embed example-config.yaml
 var ExampleConfig string
 
 var (

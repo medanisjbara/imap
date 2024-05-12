@@ -67,8 +67,6 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Bool, "metrics", "enabled")
 	helper.Copy(up.Str, "metrics", "listen")
 
-	helper.Copy(up.Str, "imap", "device_name")
-
 	if usernameTemplate, ok := helper.Get(up.Str, "bridge", "username_template"); ok && strings.Contains(usernameTemplate, "{userid}") {
 		helper.Set(up.Str, strings.ReplaceAll(usernameTemplate, "{userid}", "{{.}}"), "bridge", "username_template")
 	} else {
@@ -85,7 +83,6 @@ func DoUpgrade(helper *up.Helper) {
 	helper.Copy(up.Bool, "bridge", "number_in_topic")
 	helper.Copy(up.Str, "bridge", "note_to_self_avatar")
 	helper.Copy(up.Int, "bridge", "portal_message_buffer")
-	helper.Copy(up.Bool, "bridge", "personal_filtering_spaces")
 	helper.Copy(up.Bool, "bridge", "bridge_notices")
 	helper.Copy(up.Bool, "bridge", "delivery_receipts")
 	helper.Copy(up.Bool, "bridge", "message_status_events")
@@ -124,9 +121,7 @@ var SpacedBlocks = [][]string{
 	{"appservice", "id"},
 	{"appservice", "as_token"},
 	{"metrics"},
-	{"imap"},
 	{"bridge"},
-	{"bridge", "personal_filtering_spaces"},
 	{"bridge", "command_prefix"},
 	{"bridge", "management_room_text"},
 	{"bridge", "encryption"},
