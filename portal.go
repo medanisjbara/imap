@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/mail"
 	"sync"
 	"time"
 
@@ -276,20 +275,15 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 	go ms.sendMessageMetrics(evt, err, "Error sending", true)
 
 	var timeStamp time.Time
-	timeStamp, err = msg.Header.Date()
-	if err != nil {
-		log.Err(err).Msg("Failed get message timestamp in database")
-	}
+	timeStamp = time.Now()
 
-	if err == nil {
-		if editTargetMsg != nil {
-			err = editTargetMsg.SetTimestamp(ctx, uint64(timeStamp.Unix()))
-			if err != nil {
-				log.Err(err).Msg("Failed to update message timestamp in database after editing")
-			}
-		} else {
-			portal.storeMessageInDB(ctx, evt.ID, sender.EmailAddress, uint64(timeStamp.Unix()), 0)
+	if editTargetMsg != nil {
+		err = editTargetMsg.SetTimestamp(ctx, uint64(timeStamp.Unix()))
+		if err != nil {
+			log.Err(err).Msg("Failed to update message timestamp in database after editing")
 		}
+	} else {
+		portal.storeMessageInDB(ctx, evt.ID, sender.EmailAddress, uint64(timeStamp.Unix()), 0)
 	}
 }
 
@@ -373,7 +367,7 @@ func (portal *Portal) addRelaybotFormat(ctx context.Context, userID id.UserID, e
 	return true
 }
 
-func (portal *Portal) sendEmailMessage(ctx context.Context, msg *mail.Message, sender *User, evtID id.EventID) error {
+func (portal *Portal) sendEmailMessage(ctx context.Context, msg string, sender *User, evtID id.EventID) error {
 	log := zerolog.Ctx(ctx).With().
 		Str("action", "send email message").
 		Stringer("event_id", evtID).
@@ -385,12 +379,7 @@ func (portal *Portal) sendEmailMessage(ctx context.Context, msg *mail.Message, s
 
 	// Check to see if portal.ChatID is an email address
 	if portal.IsPrivateChat() {
-		// this is a 1:1 chat
-		address, err := mail.ParseAddress(portal.EmailAddress)
-		if err != nil {
-			return err
-		}
-		err = sender.Client.SendEmail(ctx, address, msg)
+		err := sender.Client.SendEmail(ctx, portal.EmailAddress, msg)
 		if err != nil {
 			return err
 		}

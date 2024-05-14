@@ -3,6 +3,7 @@ module mybridge
 go 1.22.2
 
 require (
+	github.com/MakMoinee/go-mith v1.2.10
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/rs/zerolog v1.32.0

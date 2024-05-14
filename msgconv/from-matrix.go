@@ -1,11 +1,9 @@
 package msgconv
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"net/mail"
 	"strings"
 
 	"maunium.net/go/mautrix/event"
@@ -46,25 +44,7 @@ func parseGeoURI(uri string) (lat, long string, err error) {
 	return
 }
 
-func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent) (*mail.Message, error) {
+func (mc *MessageConverter) ToEmail(ctx context.Context, evt *event.Event, content *event.MessageEventContent) (string, error) {
 	// FIXME
-	body := content.Body
-
-	from := "sender@example.com"
-	to := "recipient@example.com"
-	subject := "Test Email"
-
-	message := &mail.Message{
-		Header: mail.Header{},
-		Body:   bytes.NewBufferString(body),
-	}
-
-	message.Header["From"] = []string{from}
-	message.Header["To"] = []string{to}
-
-	if subject != "" {
-		message.Header["Subject"] = []string{subject}
-	}
-
-	return message, nil
+	return content.Body, nil
 }
