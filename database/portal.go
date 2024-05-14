@@ -60,6 +60,10 @@ type Portal struct {
 	ExpirationTime uint32
 }
 
+func newPortal(qh *dbutil.QueryHelper[*Portal]) *Portal {
+	return &Portal{qh: qh}
+}
+
 func (pq *PortalQuery) GetAllWithMXID(ctx context.Context) ([]*Portal, error) {
 	return pq.QueryMany(ctx, getAllPortalsWithMXIDQuery)
 }

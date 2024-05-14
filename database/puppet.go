@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	puppetBaseSelect           = `SELECT email_address, name, custom_mxid, access_token FROM puppet`
+	puppetBaseSelect           = `SELECT email_address, name, custom_mxid, access_token FROM puppet `
 	getPuppetByMetaIDQuery     = puppetBaseSelect + `WHERE id=$1`
 	getPuppetByCustomMXIDQuery = puppetBaseSelect + `WHERE custom_mxid=$1`
 	getPuppetsWithCustomMXID   = puppetBaseSelect + `WHERE custom_mxid<>''`
@@ -34,6 +34,10 @@ type Puppet struct {
 
 	CustomMXID  id.UserID
 	AccessToken string
+}
+
+func newPuppet(qh *dbutil.QueryHelper[*Puppet]) *Puppet {
+	return &Puppet{qh: qh}
 }
 
 func (pq *PuppetQuery) GetByEmailAddress(ctx context.Context, email string) (*Puppet, error) {

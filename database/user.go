@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	getUserBaseQuery           = `SELECT mxid, email_address, password, management_room, space_room FROM "user"`
+	getUserBaseQuery           = `SELECT mxid, email_address, password, management_room, space_room FROM "user" `
 	getUserByMXIDQuery         = getUserBaseQuery + `WHERE mxid=$1`
 	getUserByEmailAddressQuery = getUserBaseQuery + `WHERE email_address=$1`
 	getAllLoggedInUsersQuery   = getUserBaseQuery + `WHERE email_address IS NOT NULL`
@@ -41,6 +41,12 @@ type User struct {
 	Password       string
 	ManagementRoom id.RoomID
 	SpaceRoom      id.RoomID
+}
+
+func newUser(qh *dbutil.QueryHelper[*User]) *User {
+	return &User{
+		qh: qh,
+	}
 }
 
 func (u *User) Scan(row dbutil.Scannable) (*User, error) {

@@ -25,8 +25,9 @@ func New(db *dbutil.Database) *Database {
 	db.UpgradeTable = upgrades.Table
 	return &Database{
 		Database: db,
-		// Initialize your query structs here using dbutil.MakeQueryHelper
-		// Example:
-		// MyQuery: &MyQuery{dbutil.MakeQueryHelper(db, newMyQuery)},
+		User:     &UserQuery{dbutil.MakeQueryHelper(db, newUser)},
+		Portal:   &PortalQuery{dbutil.MakeQueryHelper(db, newPortal)},
+		Puppet:   &PuppetQuery{dbutil.MakeQueryHelper(db, newPuppet)},
+		Message:  &MessageQuery{dbutil.MakeQueryHelper(db, newMessage)},
 	}
 }
