@@ -49,6 +49,7 @@ CREATE TABLE puppet (
 CREATE TABLE "user" (
     mxid  TEXT PRIMARY KEY,
     email_address  TEXT,
+    password       TEXT,
 
     management_room TEXT,
     space_room      TEXT,
