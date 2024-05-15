@@ -87,15 +87,16 @@ func (br *MyBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
 }
 
 func (br *MyBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
-	// Implement your user retrieval logic here
-	fmt.Println("Get I User")
-	return nil
+	p := br.GetUserByMXID(mxid)
+	if p == nil {
+		return nil
+	}
+	return p
 }
 
 func (br *MyBridge) IsGhost(mxid id.UserID) bool {
-	// Implement your ghost checking logic here
-	fmt.Println("Is Ghost")
-	return false
+	_, isGhost := br.ParsePuppetMXID(mxid)
+	return isGhost
 }
 
 func (br *MyBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
@@ -111,7 +112,13 @@ func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User,
 
 func main() {
 	br := &MyBridge{
-		// Initialize your bridge fields here
+		usersByMXID:         make(map[id.UserID]*User),
+		usersByEmailAddress: make(map[string]*User),
+
+		managementRooms: make(map[id.RoomID]*User),
+
+		portalsByMXID: make(map[id.RoomID]*Portal),
+		portalsByID:   make(map[database.PortalKey]*Portal),
 	}
 	br.Bridge = bridge.Bridge{
 		Name:        "mybridge",

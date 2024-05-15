@@ -10,31 +10,32 @@ import (
 type Client struct {
 	emailAddress string
 	password     string
-	log          zerolog.Logger
+	Zlog         zerolog.Logger
 
 	emailService email.EmailIntf
 	EventHandler func(any)
 }
 
-func NewClient(email string, password string, log zerolog.Logger) *Client {
+func NewClient(address string, password string) *Client {
+	emailService := email.NewEmailService(587, "smtp.gmail.com", address, password)
 	return &Client{
-		emailAddress: email,
+		emailAddress: address,
 		password:     password,
-		log:          log,
+		emailService: emailService,
 	}
 }
 
 func (c *Client) SendEmail(ctx context.Context, reciever string, msg string) error {
 	isSent, err := c.emailService.SendEmail(reciever, "Forwarder From Matrix", msg)
 	if err != nil {
-		c.log.Err(err).Msg("Couldn't send email")
+		c.Zlog.Err(err).Msg("Couldn't send email")
 		return err
 	}
 
 	if isSent {
-		c.log.Debug().Msg("Email Sent")
+		c.Zlog.Debug().Msg("Email Sent")
 	} else {
-		c.log.Debug().Msg("Email Not Sent")
+		c.Zlog.Debug().Msg("Email Not Sent")
 	}
 	return nil
 }

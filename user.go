@@ -123,15 +123,17 @@ func (user *User) SetManagementRoom(roomID id.RoomID) {
 }
 
 func (user *User) Connect() {
+	user.log.Debug().Msg("Connecting user")
 	log := user.log.With().Str("component", "messagix").Logger()
-	cli := emailmeow.NewClient(user.EmailAddress, user.Password, log)
+	cli := emailmeow.NewClient(user.EmailAddress, user.Password)
+	cli.Zlog = log
 	cli.EventHandler = user.eventHandler
 	user.Client = cli
 	// TODO maybe add user.lastFullReconnect = time.Now() ?
 }
 
 func (user *User) eventHandler(rawEvt any) {
-	// TODO: FIXME
+	user.log.Error().Msg("Event handler not implemented yet")
 }
 
 func (br *MyBridge) GetAllLoggedInUsers() []*User {

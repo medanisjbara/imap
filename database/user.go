@@ -50,10 +50,11 @@ func newUser(qh *dbutil.QueryHelper[*User]) *User {
 }
 
 func (u *User) Scan(row dbutil.Scannable) (*User, error) {
-	var emailAddress, managementRoom, spaceRoom sql.NullString
+	var emailAddress, password, managementRoom, spaceRoom sql.NullString
 	err := row.Scan(
 		&u.MXID,
 		&emailAddress,
+		&password,
 		&managementRoom,
 		&spaceRoom,
 	)
@@ -61,6 +62,7 @@ func (u *User) Scan(row dbutil.Scannable) (*User, error) {
 		return nil, err
 	}
 	u.EmailAddress = emailAddress.String
+	u.Password = password.String
 	u.ManagementRoom = id.RoomID(managementRoom.String)
 	u.SpaceRoom = id.RoomID(spaceRoom.String)
 	return u, nil
@@ -70,6 +72,7 @@ func (u *User) sqlVariables() []any {
 	return []any{
 		u.MXID,
 		dbutil.StrPtr(u.EmailAddress),
+		dbutil.StrPtr(u.Password),
 		dbutil.StrPtr(u.ManagementRoom),
 		dbutil.StrPtr(u.SpaceRoom),
 	}

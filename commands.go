@@ -1,6 +1,9 @@
 package main
 
 import (
+	"mybridge/pkg/emailmeow"
+	"strings"
+
 	"maunium.net/go/mautrix/bridge/commands"
 )
 
@@ -41,22 +44,20 @@ var cmdLogin = &commands.FullHandler{
 }
 
 func fnLogin(ce *WrappedCommandEvent) {
-	if len(ce.Args) != 3 {
-		ce.Reply("**Usage**: $cmdprefix login-password <email> <password>")
+	if len(ce.Args) < 2 {
+		ce.Reply("**Usage**: $cmdprefix login <email> <password>")
 		return
 	}
 
-	if ce.User.Client.IsLoggedIn() {
+	if ce.User.Client != nil && ce.User.Client.IsLoggedIn() {
 		ce.Reply("%s is already logged %s", ce.Args[0], ce.Args[1])
 		return
 	}
 
 	user := ce.Bridge.GetUserByMXID(ce.User.MXID)
-	err := user.Client.Login(ce.Ctx, ce.Args[0], ce.Args[1])
-	if err != nil {
-		ce.Reply("Failed to log in")
-		return
-	}
+	user.Client = emailmeow.NewClient(ce.Args[0], strings.Join(ce.Args[1:], " "))
+	ce.User.EmailAddress = ce.Args[0]
+	ce.User.Password = strings.Join(ce.Args[1:], " ")
 	ce.Reply("Successfully logged")
 }
 
