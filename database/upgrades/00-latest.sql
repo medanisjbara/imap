@@ -1,8 +1,6 @@
 -- v0 -> v1: Latest revision
 
 
--- TODO: Add email_address
-
 CREATE TABLE portal (
     thread_id   TEXT    NOT NULL,
     receiver    TEXT    NOT NULL,
@@ -11,6 +9,7 @@ CREATE TABLE portal (
     topic       TEXT    NOT NULL,
     encrypted   BOOLEAN NOT NULL DEFAULT false,
     avatar_path TEXT    NOT NULL DEFAULT '',
+    email_address TEXT  NOT NULL,
     avatar_hash TEXT    NOT NULL,
     avatar_url  TEXT    NOT NULL,
     name_set    BOOLEAN NOT NULL DEFAULT false,
