@@ -38,7 +38,7 @@ var cmdLogin = &commands.FullHandler{
 	Name: "login",
 	Help: commands.HelpMeta{
 		Section:     commands.HelpSectionAuth,
-		Description: "Link the bridge to your Meta account.",
+		Description: "Link the bridge to your email account.",
 	},
 }
 
@@ -68,7 +68,7 @@ var cmdPing = &commands.FullHandler{
 	Name: "ping",
 	Help: commands.HelpMeta{
 		Section:     commands.HelpSectionAuth,
-		Description: "Check your connection to Signal",
+		Description: "Check your connection to IMAP",
 	},
 }
 

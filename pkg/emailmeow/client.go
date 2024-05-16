@@ -17,11 +17,17 @@ type Client struct {
 	password     string
 	Zlog         zerolog.Logger
 
+	EventHandler func(*imapclient.UnilateralDataMailbox)
+
 	emailService email.EmailIntf
-	EventHandler func(any)
+
 	imapClient   *imapclient.Client
+	IMAPServer   string
 	selectedMbox *imap.SelectData
 	idleCmd      *imapclient.IdleCommand
+	imapOptions  imapclient.Options
+
+	connectionStatus chan (EmailConnectionStatus)
 }
 
 func NewClient(address string, password string) *Client {
@@ -48,9 +54,40 @@ func (c *Client) SendEmail(ctx context.Context, reciever string, msg string) err
 	return nil
 }
 
-func (c *Client) Login(ctx context.Context, address string, password string) error {
+func (cli *Client) Login(ctx context.Context, address string, password string) error {
 	// Check https://github.com/MakMoinee/go-mith/commit/9f22c396ea1adbf24a8721fa29cafea2cea1954f
-	c.emailService = email.NewEmailService(587, "smtp.gmail.com", address, password)
+	cli.emailService = email.NewEmailService(587, "smtp.gmail.com", address, password)
+
+	cli.imapOptions = imapclient.Options{
+		UnilateralDataHandler: &imapclient.UnilateralDataHandler{
+			Expunge: func(seqNum uint32) {
+				cli.Zlog.Printf("message %v has been expunged", seqNum)
+			},
+			Mailbox: cli.EventHandler,
+		},
+	}
+
+	imapcli, err := imapclient.DialTLS(cli.IMAPServer, &cli.imapOptions)
+	if err != nil {
+		cli.Zlog.Err(err).Msg("failed to dial IMAP server: %v")
+		return err
+	}
+
+	cli.imapClient = imapcli
+
+	if err := cli.imapClient.Login(cli.emailAddress, cli.password).Wait(); err != nil {
+		cli.Zlog.Err(err).Msg("failed to login: %v")
+		return err
+	}
+
+	mboxIndex, err := cli.imapClient.Select("INBOX", nil).Wait()
+	if err != nil {
+		cli.Zlog.Err(err).Msg("failed to select INBOX: %v")
+		return err
+	}
+
+	cli.selectedMbox = mboxIndex
+
 	return nil
 }
 
@@ -62,7 +99,7 @@ func (c *Client) GetCurrentUser() (string, error) {
 	return c.emailAddress, nil
 }
 
-func (cli *Client) handleEvent(evt any) {
+func (cli *Client) handleEvent(evt *imapclient.UnilateralDataMailbox) {
 	if cli.EventHandler != nil {
 		cli.EventHandler(evt)
 	}

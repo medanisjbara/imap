@@ -1,12 +1,31 @@
 package emailmeow
 
-import "context"
+import (
+	"context"
+
+	"github.com/emersion/go-message/mail"
+)
 
 type EmailConnectionStatus struct {
-	Event string
+	Event mail.Part
 	Err   error
 }
 
-func (c *Client) StartReceiveLoops(ctx context.Context) (chan EmailConnectionStatus, error) {
-	return nil, nil
+func (cli *Client) StartReceiveLoops(ctx context.Context) (chan EmailConnectionStatus, error) {
+	defer func() {
+		if err := cli.idleCmd.Close(); err != nil {
+			cli.Zlog.Err(err).Msg("failed to stop idling: %v")
+		}
+	}()
+
+	// Start idling
+	initialIdleCmd, err := cli.imapClient.Idle()
+	if err != nil {
+		cli.Zlog.Err(err).Msg("IDLE command failed: %v")
+		return nil, err
+	}
+
+	cli.idleCmd = initialIdleCmd
+
+	return cli.connectionStatus, nil
 }
