@@ -436,7 +436,7 @@ func (portal *Portal) sendEmailMessage(ctx context.Context, msg string, sender *
 
 	log.Debug().Msg("Sending event to Email")
 
-	// Check to see if portal.ChatID is an email address
+	// Check to see if portal.ThreadID is an email address
 	if portal.IsPrivateChat() {
 		err := sender.Client.SendEmail(ctx, portal.EmailAddress, msg)
 		if err != nil {
@@ -541,6 +541,10 @@ func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 
 func (portal *Portal) ensureUserInvited(ctx context.Context, user *User) bool {
 	return user.ensureInvited(ctx, portal.MainIntent(), portal.MXID, portal.IsPrivateChat())
+}
+
+func (portal *Portal) UpdateDMInfo(ctx context.Context, forceSave bool) {
+	// FIXME
 }
 
 func (portal *Portal) CreateMatrixRoom(ctx context.Context, user *User, emailAddress string) error {
@@ -675,13 +679,13 @@ func (br *MyBridge) FindPrivateChatPortalsWith(address string) []*Portal {
 	return portals
 }
 
-func (br *MyBridge) GetPortalByChatID(key database.PortalKey) *Portal {
+func (br *MyBridge) GetPortalByThreadID(key database.PortalKey) *Portal {
 	br.portalsLock.Lock()
 	defer br.portalsLock.Unlock()
-	return br.unlockedGetPortalByChatID(key, true)
+	return br.unlockedGetPortalByThreadID(key, true)
 }
 
-func (br *MyBridge) unlockedGetPortalByChatID(key database.PortalKey, createIfNotExists bool) *Portal {
+func (br *MyBridge) unlockedGetPortalByThreadID(key database.PortalKey, createIfNotExists bool) *Portal {
 	portal, ok := br.portalsByID[key]
 	if !ok {
 		dbPortal, err := br.DB.Portal.GetByThreadID(context.TODO(), key)
@@ -698,6 +702,17 @@ func (br *MyBridge) unlockedGetPortalByChatID(key database.PortalKey, createIfNo
 	return portal
 }
 
-func (portal *Portal) UpdateDMInfo(ctx context.Context, forceSave bool) {
-	// FIXME
+func (br *MyBridge) GetPortalByThreadIDIfExists(key database.PortalKey) *Portal {
+	br.portalsLock.Lock()
+	defer br.portalsLock.Unlock()
+	return br.unlockedGetPortalByThreadID(key, false)
+}
+
+func (br *MyBridge) GetAllPortalsWithMXID() []*Portal {
+	portals, err := br.dbPortalsToPortals(br.DB.Portal.GetAllWithMXID(context.TODO()))
+	if err != nil {
+		br.ZLog.Err(err).Msg("Failed to get all portals with mxid")
+		return nil
+	}
+	return portals
 }

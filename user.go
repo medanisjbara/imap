@@ -10,6 +10,7 @@ import (
 	"mybridge/database"
 	"mybridge/pkg/emailmeow"
 
+	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/rs/zerolog"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
@@ -139,7 +140,35 @@ func (user *User) Connect() {
 }
 
 func (user *User) eventHandler(rawEvt any) {
-	user.log.Error().Msg("Event handler not implemented yet")
+	switch evt := rawEvt.(type) {
+	case *imapclient.UnilateralDataMailbox:
+		// Note that part here represents mail.Part from go-message/mail
+		// Which is an entire mail message
+		lastReceivedMessage, err := user.Client.FetchLastMessagePart()
+		if err != nil {
+			user.log.Warn().Msg("Couldn't get message, dropping!")
+		}
+
+		sender_address := string(lastReceivedMessage.Header.Get("From"))
+		if sender_address == "" {
+			// user.log.Err(errors.New("Failed to parse")).Msg("failed to parse From header field, dropping")
+			// return
+			user.log.Warn().Msg("failed to parse From header field")
+			sender_address = "unknown"
+		}
+
+		portal := user.GetPortalByThreadID(sender_address)
+
+		if portal != nil {
+			portal.emailMessages <- portalEmailMessage{user: user, message: &lastReceivedMessage}
+		} else {
+			user.log.Warn().Str("thread_id", sender_address).Msg("Couldn't get portal, dropping message")
+		}
+		content := &event.MessageEventContent{MsgType: event.MsgNotice}
+		portal.sendMainIntentMessage(context.TODO(), content)
+	default:
+		user.log.Warn().Msgf("Unhandled event type: %T", evt)
+	}
 }
 
 func (user *User) ensureInvited(ctx context.Context, intent *appservice.IntentAPI, roomID id.RoomID, isDirect bool) (ok bool) {
@@ -407,4 +436,11 @@ func (br *MyBridge) NewUser(dbUser *database.User) *User {
 	user.Admin = user.PermissionLevel >= bridgeconfig.PermissionLevelAdmin
 	user.BridgeState = br.NewBridgeStateQueue(user)
 	return user
+}
+
+func (user *User) GetPortalByThreadID(address string) *Portal {
+	return user.bridge.GetPortalByThreadID(database.PortalKey{
+		ThreadID: address,
+		Receiver: address,
+	})
 }

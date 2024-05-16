@@ -2,8 +2,13 @@ package emailmeow
 
 import (
 	"context"
+	"fmt"
+	"io"
 
 	"github.com/MakMoinee/go-mith/pkg/email"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/emersion/go-message/mail"
 	"github.com/rs/zerolog"
 )
 
@@ -14,6 +19,9 @@ type Client struct {
 
 	emailService email.EmailIntf
 	EventHandler func(any)
+	imapClient   *imapclient.Client
+	selectedMbox *imap.SelectData
+	idleCmd      *imapclient.IdleCommand
 }
 
 func NewClient(address string, password string) *Client {
@@ -58,4 +66,41 @@ func (cli *Client) handleEvent(evt any) {
 	if cli.EventHandler != nil {
 		cli.EventHandler(evt)
 	}
+}
+
+func (cli *Client) FetchLastMessagePart() (mail.Part, error) {
+	seqSet := imap.SeqSetNum(cli.selectedMbox.NumMessages)
+	fetchOptions := &imap.FetchOptions{
+		BodySection: []*imap.FetchItemBodySection{{}},
+	}
+	fetchCmd := cli.imapClient.Fetch(seqSet, fetchOptions)
+	defer fetchCmd.Close()
+
+	msg := fetchCmd.Next()
+	if msg == nil {
+		return mail.Part{}, fmt.Errorf("FETCH command did not return any message")
+	}
+
+	var bodySection imapclient.FetchItemDataBodySection
+	for item := msg.Next(); item != nil; item = msg.Next() {
+		if bs, ok := item.(imapclient.FetchItemDataBodySection); ok {
+			bodySection = bs
+			break
+		}
+	}
+
+	mr, err := mail.CreateReader(bodySection.Literal)
+	if err != nil {
+		return mail.Part{}, fmt.Errorf("failed to create mail reader: %v", err)
+	}
+
+	part, err := mr.NextPart()
+	if err != nil {
+		if err == io.EOF {
+			return mail.Part{}, fmt.Errorf("no parts found in the message")
+		}
+		return mail.Part{}, fmt.Errorf("failed to read message part: %v", err)
+	}
+
+	return *part, nil
 }

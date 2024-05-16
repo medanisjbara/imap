@@ -127,7 +127,7 @@ func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User,
 	log.Debug().Msg("Creating private chat portal")
 
 	key := database.NewPortalKey(puppet.EmailAddress, inviter.EmailAddress)
-	portal := br.GetPortalByChatID(key)
+	portal := br.GetPortalByThreadID(key)
 	ctx := log.WithContext(context.TODO())
 
 	if len(portal.MXID) == 0 {
