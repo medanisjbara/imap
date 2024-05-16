@@ -1,7 +1,6 @@
 package main
 
 import (
-	"mybridge/pkg/emailmeow"
 	"strings"
 
 	"maunium.net/go/mautrix/bridge/commands"
@@ -55,9 +54,12 @@ func fnLogin(ce *WrappedCommandEvent) {
 	}
 
 	user := ce.Bridge.GetUserByMXID(ce.User.MXID)
-	user.Client = emailmeow.NewClient(ce.Args[0], strings.Join(ce.Args[1:], " "))
-	ce.User.EmailAddress = ce.Args[0]
-	ce.User.Password = strings.Join(ce.Args[1:], " ")
+	reply, err := user.Login(ce.Ctx, ce.Args[0], strings.Join(ce.Args[1:], " "))
+	if err != nil {
+		ce.Reply(reply)
+		return
+	}
+
 	ce.Reply("Successfully logged")
 }
 

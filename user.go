@@ -354,6 +354,35 @@ func (user *User) getDirectChats() map[id.UserID][]id.RoomID {
 	return chats
 }
 
+func (user *User) Login(ctx context.Context, address string, password string) (string, error) {
+	if address == "" {
+		reply := "Can't login with empty address"
+		return reply, errors.New(reply)
+	}
+
+	if password == "" {
+		reply := "Can't login with empty password"
+		return reply, errors.New(reply)
+	}
+
+	user.EmailAddress = address
+	user.Password = password
+	mailClient := emailmeow.NewClient(address, password)
+	err := mailClient.Login(ctx, address, password)
+	if err != nil {
+		return "Couldn't login check logs", err
+	}
+
+	user.Client = mailClient
+
+	err = user.Update(ctx)
+	if err != nil {
+		zerolog.Ctx(ctx).Err(err).Msg("Failed to save user's email and password")
+	}
+
+	return "Login successful", nil
+}
+
 func (br *MyBridge) GetAllLoggedInUsers() []*User {
 	br.usersLock.Lock()
 	defer br.usersLock.Unlock()
