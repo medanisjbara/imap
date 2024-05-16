@@ -8,17 +8,18 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+// email_address, name, name_set, custom_mxid, access_token
 const (
-	puppetBaseSelect           = `SELECT email_address, name, custom_mxid, access_token FROM puppet `
+	puppetBaseSelect           = `SELECT email_address, name, name_set, custom_mxid, access_token FROM puppet `
 	getPuppetByMetaIDQuery     = puppetBaseSelect + `WHERE id=$1`
 	getPuppetByCustomMXIDQuery = puppetBaseSelect + `WHERE custom_mxid=$1`
 	getPuppetsWithCustomMXID   = puppetBaseSelect + `WHERE custom_mxid<>''`
-	updatePuppetQuery          = `UPDATE puppet SET name=$2, custom_mxid=$3, access_token=$4 WHERE email_address=$1`
+	updatePuppetQuery          = `UPDATE puppet SET name=$2, name_set=$3, custom_mxid=$3, access_token=$4 WHERE email_address=$1`
 	insertPuppetQuery          = `
 		INSERT INTO puppet (
-            email_address, name, custom_mxi, access_tokend
+						email_address, name, name_set, custom_mxid, access_token
 		)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 )
 
@@ -31,6 +32,8 @@ type Puppet struct {
 
 	EmailAddress string
 	Name         string
+
+	NameSet bool
 
 	CustomMXID  id.UserID
 	AccessToken string
@@ -57,7 +60,9 @@ func (p *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 	err := row.Scan(
 		&p.EmailAddress,
 		&p.Name,
+		&p.NameSet,
 		&customMXID,
+		&p.AccessToken,
 	)
 	if err != nil {
 		return nil, err
@@ -68,8 +73,10 @@ func (p *Puppet) Scan(row dbutil.Scannable) (*Puppet, error) {
 
 func (p *Puppet) sqlVariables() []any {
 	return []any{
-		p.Name,
 		p.EmailAddress,
+		p.Name,
+		p.NameSet,
+		p.AccessToken,
 		dbutil.StrPtr(p.CustomMXID),
 	}
 }

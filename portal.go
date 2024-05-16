@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"time"
+
+	"github.com/emersion/go-message/mail"
 
 	"github.com/rs/zerolog"
 
@@ -17,7 +20,6 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"mybridge/database"
-	"mybridge/msgconv"
 )
 
 type msgconvContextKey int
@@ -28,8 +30,8 @@ const (
 )
 
 type portalEmailMessage struct {
-	evt  any
-	user *User
+	message *mail.Part
+	user    *User
 }
 
 type portalMatrixMessage struct {
@@ -41,12 +43,11 @@ type portalMatrixMessage struct {
 type Portal struct {
 	*database.Portal
 
-	MsgConv *msgconv.MessageConverter
-
 	bridge *MyBridge
 	log    zerolog.Logger
 
-	encryptLock sync.Mutex
+	roomCreateLock sync.Mutex
+	encryptLock    sync.Mutex
 
 	emailMessages  chan portalEmailMessage
 	matrixMessages chan portalMatrixMessage
@@ -259,17 +260,14 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 		return
 	}
 	ctx = context.WithValue(ctx, msgconvContextKeyClient, sender.Client)
-	msg, err := portal.MsgConv.ToEmail(ctx, evt, content)
-	if err != nil {
-		log.Err(err).Msg("Failed to convert message")
-		go ms.sendMessageMetrics(evt, err, "Error converting", true)
-		return
-	}
 
 	timings.convert = time.Since(start)
 	start = time.Now()
 
-	err = portal.sendEmailMessage(ctx, msg, sender, evt.ID)
+	err := portal.sendEmailMessage(ctx, content.Body, sender, evt.ID)
+	if err != nil {
+		log.Err(err).Str("content_body", content.Body).Msg("Failed to send email")
+	}
 
 	timings.totalSend = time.Since(start)
 	go ms.sendMessageMetrics(evt, err, "Error sending", true)
@@ -291,12 +289,47 @@ func (portal *Portal) handleMatrixMessage(ctx context.Context, sender *User, evt
 type DataMessage string
 
 func (portal *Portal) handleEmailMessage(portalMessage portalEmailMessage) {
-	switch typedEvt := portalMessage.evt.(type) {
-	default:
-		portal.log.Error().
-			Type("data_type", typedEvt).
-			Msg("Invalid inner event type inside meta message")
+	sender_address := portalMessage.message.Header.Get("From")
+
+	log := portal.log.With().
+		Str("action", "handle email message").
+		Str("email_address", sender_address).
+		Logger()
+
+	ctx := log.WithContext(context.Background())
+
+	if portal.MXID == "" {
+		portal.log.Debug().
+			Str("email_address", sender_address).
+			Msg("Creating Matrix room from incoming message")
+		if err := portal.CreateMatrixRoom(ctx, portalMessage.user, sender_address); err != nil {
+			portal.log.Err(err).Msg("Failed to create portal room")
+			return
+		}
 	}
+
+	sender := portal.bridge.GetPuppetByEmailAddress(sender_address)
+
+	// intent := sender.IntentFor(portal)
+
+	body, err := ioutil.ReadAll(portalMessage.message.Body)
+	if err != nil {
+		log.Err(err).Msg("Failed to parse email message")
+		return
+	}
+
+	content := &event.MessageEventContent{
+		MsgType: event.MsgText,
+		Body:    string(body),
+	}
+
+	resp, err := portal.sendMatrixEvent(ctx, portal.MainIntent(), event.EventMessage, content, nil, 0)
+	if err != nil {
+		log.Err(err).Msg("Failed to send message to Matrix")
+		return
+	}
+
+	portal.storeMessageInDB(ctx, resp.EventID, sender.EmailAddress, uint64(time.Now().UnixMilli()), 0)
 }
 
 func (portal *Portal) sendMainIntentMessage(ctx context.Context, content *event.MessageEventContent) (*mautrix.RespSendEvent, error) {
@@ -329,6 +362,15 @@ func (portal *Portal) sendMatrixEvent(ctx context.Context, intent *appservice.In
 
 	_, _ = intent.UserTyping(ctx, portal.MXID, false, 0)
 	return intent.SendMassagedMessageEvent(ctx, portal.MXID, eventType, &wrappedContent, timestamp)
+}
+
+func (portal *Portal) getEncryptionEventContent() (evt *event.EncryptionEventContent) {
+	evt = &event.EncryptionEventContent{Algorithm: id.AlgorithmMegolmV1}
+	if rot := portal.bridge.Config.Bridge.Encryption.Rotation; rot.EnableCustom {
+		evt.RotationPeriodMillis = rot.Milliseconds
+		evt.RotationPeriodMessages = rot.Messages
+	}
+	return
 }
 
 func (portal *Portal) getBridgeInfoStateKey() string {
@@ -412,6 +454,7 @@ func (br *MyBridge) dbPortalsToPortals(dbPortals []*database.Portal, err error) 
 	if err != nil {
 		return nil, err
 	}
+
 	br.portalsLock.Lock()
 	defer br.portalsLock.Unlock()
 
@@ -473,11 +516,140 @@ func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 		emailMessages:  make(chan portalEmailMessage, br.Config.Bridge.PortalMessageBuffer),
 		matrixMessages: make(chan portalMatrixMessage, br.Config.Bridge.PortalMessageBuffer),
 	}
-	portal.MsgConv = &msgconv.MessageConverter{
-		PortalMethods: portal,
-		MaxFileSize:   br.MediaConfig.UploadSize,
-	}
+
 	go portal.messageLoop()
 
 	return portal
+}
+
+func (portal *Portal) CreateMatrixRoom(ctx context.Context, user *User, emailAddress string) error {
+	portal.roomCreateLock.Lock()
+	defer portal.roomCreateLock.Unlock()
+	if portal.MXID != "" {
+		portal.log.Debug().Msg("Not creating room: already exists")
+		return nil
+	}
+	portal.log.Debug().Msg("Creating matrix room")
+
+	intent := portal.MainIntent()
+
+	bridgeInfoStateKey, bridgeInfo := portal.getBridgeInfo()
+	initialState := []*event.Event{{
+		Type:     event.StateBridge,
+		Content:  event.Content{Parsed: bridgeInfo},
+		StateKey: &bridgeInfoStateKey,
+	}, {
+		// TODO remove this once https://github.com/matrix-org/matrix-doc/pull/2346 is in spec
+		Type:     event.StateHalfShotBridge,
+		Content:  event.Content{Parsed: bridgeInfo},
+		StateKey: &bridgeInfoStateKey,
+	}}
+
+	if !portal.AvatarURL.IsEmpty() {
+		initialState = append(initialState, &event.Event{
+			Type: event.StateRoomAvatar,
+			Content: event.Content{Parsed: &event.RoomAvatarEventContent{
+				URL: portal.AvatarURL,
+			}},
+		})
+	}
+
+	creationContent := make(map[string]interface{})
+	if !portal.bridge.Config.Bridge.FederateRooms {
+		creationContent["m.federate"] = false
+	}
+
+	var invite []id.UserID
+	autoJoinInvites := portal.bridge.SpecVersions.Supports(mautrix.BeeperFeatureAutojoinInvites)
+	if autoJoinInvites {
+		invite = append(invite, user.MXID)
+	}
+
+	if portal.bridge.Config.Bridge.Encryption.Default {
+		initialState = append(initialState, &event.Event{
+			Type: event.StateEncryption,
+			Content: event.Content{
+				Parsed: portal.getEncryptionEventContent(),
+			},
+		})
+		portal.Encrypted = true
+
+		if portal.IsPrivateChat() && portal.MainIntent() != portal.bridge.Bot {
+			invite = append(invite, portal.bridge.Bot.UserID)
+		}
+	}
+
+	var dmPuppet *Puppet
+	if portal.IsPrivateChat() {
+		dmPuppet = portal.GetDMPuppet()
+		if dmPuppet != nil {
+			dmPuppet.UpdateInfo(ctx, user)
+		}
+	} else {
+		portal.log.Warn().Msg("Not implemented yet")
+	}
+
+	req := &mautrix.ReqCreateRoom{
+		Visibility:      "private",
+		Name:            portal.Name,
+		Topic:           portal.Topic,
+		Invite:          invite,
+		Preset:          "private_chat",
+		IsDirect:        portal.IsPrivateChat(),
+		InitialState:    initialState,
+		CreationContent: creationContent,
+
+		BeeperAutoJoinInvites: autoJoinInvites,
+	}
+	resp, err := intent.CreateRoom(ctx, req)
+	if err != nil {
+		portal.log.Warn().Err(err).Msg("failed to create room")
+		return err
+	}
+	portal.log = portal.log.With().Stringer("room_id", resp.RoomID).Logger()
+
+	portal.NameSet = len(req.Name) > 0
+	portal.TopicSet = len(req.Topic) > 0
+	portal.AvatarSet = !portal.AvatarURL.IsEmpty()
+	portal.MXID = resp.RoomID
+	portal.bridge.portalsLock.Lock()
+	portal.bridge.portalsByMXID[portal.MXID] = portal
+	portal.bridge.portalsLock.Unlock()
+	err = portal.Update(ctx)
+	if err != nil {
+		portal.log.Err(err).Msg("Failed to save portal room ID")
+		return err
+	}
+	portal.log.Info().Msg("Created matrix room for portal")
+
+	if !autoJoinInvites {
+		if !portal.IsPrivateChat() {
+			// portal.SyncParticipants(ctx, user, groupInfo)
+		} else if portal.Encrypted {
+			err = portal.bridge.Bot.EnsureJoined(ctx, portal.MXID, appservice.EnsureJoinedParams{BotOverride: portal.MainIntent().Client})
+			if err != nil {
+				portal.log.Error().Err(err).Msg("Failed to ensure bridge bot is joined to private chat portal")
+			}
+		}
+		user.ensureInvited(ctx, portal.MainIntent(), portal.MXID, portal.IsPrivateChat())
+	}
+	user.syncChatDoublePuppetDetails(portal, true)
+	// TODO: go portal.addToPersonalSpace(portal.log.WithContext(context.TODO()), user)
+
+	if dmPuppet != nil {
+		user.UpdateDirectChats(ctx, map[id.UserID][]id.RoomID{
+			dmPuppet.MXID: {portal.MXID},
+		})
+	}
+
+	return nil
+}
+
+func (br *MyBridge) FindPrivateChatPortalsWith(address string) []*Portal {
+	portals, err := br.dbPortalsToPortals(br.DB.Portal.FindPrivateChatsWith(context.TODO(), address))
+	if err != nil {
+		br.ZLog.Err(err).Msg("Failed to get all DM portals with user")
+		return nil
+	}
+	return portals
 }

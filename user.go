@@ -2,15 +2,21 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"strings"
 	"sync"
 
 	"mybridge/database"
 	"mybridge/pkg/emailmeow"
 
 	"github.com/rs/zerolog"
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/bridge"
 	"maunium.net/go/mautrix/bridge/bridgeconfig"
 	"maunium.net/go/mautrix/bridge/status"
+	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -134,6 +140,189 @@ func (user *User) Connect() {
 
 func (user *User) eventHandler(rawEvt any) {
 	user.log.Error().Msg("Event handler not implemented yet")
+}
+
+func (user *User) ensureInvited(ctx context.Context, intent *appservice.IntentAPI, roomID id.RoomID, isDirect bool) (ok bool) {
+	log := user.log.With().Str("action", "ensure_invited").Stringer("room_id", roomID).Logger()
+	if user.bridge.StateStore.IsMembership(ctx, roomID, user.MXID, event.MembershipJoin) {
+		ok = true
+		return
+	}
+	extraContent := make(map[string]interface{})
+	if isDirect {
+		extraContent["is_direct"] = true
+	}
+	customPuppet := user.bridge.GetPuppetByCustomMXID(user.MXID)
+	if customPuppet != nil && customPuppet.CustomIntent() != nil {
+		extraContent["fi.mau.will_auto_accept"] = true
+	}
+	_, err := intent.InviteUser(ctx, roomID, &mautrix.ReqInviteUser{UserID: user.MXID}, extraContent)
+	var httpErr mautrix.HTTPError
+	if err != nil && errors.As(err, &httpErr) && httpErr.RespError != nil && strings.Contains(httpErr.RespError.Err, "is already in the room") {
+		err = user.bridge.StateStore.SetMembership(ctx, roomID, user.MXID, event.MembershipJoin)
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to update membership in state store")
+		}
+		ok = true
+		return
+	} else if err != nil {
+		log.Warn().Err(err).Msg("Failed to invite user to room")
+	} else {
+		ok = true
+	}
+
+	if customPuppet != nil && customPuppet.CustomIntent() != nil {
+		err = customPuppet.CustomIntent().EnsureJoined(ctx, roomID, appservice.EnsureJoinedParams{IgnoreCache: true})
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to auto-join custom puppet")
+			ok = false
+		} else {
+			ok = true
+		}
+	}
+	return
+}
+
+func (user *User) syncChatDoublePuppetDetails(portal *Portal, justCreated bool) {
+	doublePuppet := portal.bridge.GetPuppetByCustomMXID(user.MXID)
+	if doublePuppet == nil {
+		return
+	}
+	if doublePuppet == nil || doublePuppet.CustomIntent() == nil || len(portal.MXID) == 0 {
+		return
+	}
+}
+
+func (user *User) UpdateDirectChats(ctx context.Context, chats map[id.UserID][]id.RoomID) {
+	if !user.bridge.Config.Bridge.SyncDirectChatList {
+		return
+	}
+
+	puppet := user.bridge.GetPuppetByMXID(user.MXID)
+	if puppet == nil {
+		return
+	}
+
+	intent := puppet.CustomIntent()
+	if intent == nil {
+		return
+	}
+
+	method := http.MethodPatch
+	if chats == nil {
+		chats = user.getDirectChats()
+		method = http.MethodPut
+	}
+
+	user.log.Debug().Msg("Updating m.direct list on homeserver")
+
+	var err error
+	if user.bridge.Config.Homeserver.Software == bridgeconfig.SoftwareAsmux {
+		urlPath := intent.BuildURL(mautrix.ClientURLPath{"unstable", "com.beeper.asmux", "dms"})
+		_, err = intent.MakeFullRequest(ctx, mautrix.FullRequest{
+			Method:      method,
+			URL:         urlPath,
+			Headers:     http.Header{"X-Asmux-Auth": {user.bridge.AS.Registration.AppToken}},
+			RequestJSON: chats,
+		})
+	} else {
+		existingChats := map[id.UserID][]id.RoomID{}
+
+		err = intent.GetAccountData(ctx, event.AccountDataDirectChats.Type, &existingChats)
+		if err != nil {
+			user.log.Warn().Err(err).Msg("Failed to get m.direct event to update it")
+			return
+		}
+
+		for userID, rooms := range existingChats {
+			if _, ok := user.bridge.ParsePuppetMXID(userID); !ok {
+				// This is not a ghost user, include it in the new list
+				chats[userID] = rooms
+			} else if _, ok := chats[userID]; !ok && method == http.MethodPatch {
+				// This is a ghost user, but we're not replacing the whole list, so include it too
+				chats[userID] = rooms
+			}
+		}
+
+		err = intent.SetAccountData(ctx, event.AccountDataDirectChats.Type, &chats)
+	}
+
+	if err != nil {
+		user.log.Warn().Err(err).Msg("Failed to update m.direct event")
+	}
+}
+
+func (user *User) GetSpaceRoom(ctx context.Context) id.RoomID {
+	if !user.bridge.Config.Bridge.PersonalFilteringSpaces {
+		return ""
+	}
+
+	if len(user.SpaceRoom) == 0 {
+		user.spaceCreateLock.Lock()
+		defer user.spaceCreateLock.Unlock()
+		if len(user.SpaceRoom) > 0 {
+			return user.SpaceRoom
+		}
+
+		resp, err := user.bridge.Bot.CreateRoom(ctx, &mautrix.ReqCreateRoom{
+			Visibility: "private",
+			Name:       "Email",
+			Topic:      "Your email bridged chats",
+			InitialState: []*event.Event{{
+				Type: event.StateRoomAvatar,
+				Content: event.Content{
+					Parsed: &event.RoomAvatarEventContent{
+						URL: user.bridge.Config.AppService.Bot.ParsedAvatar,
+					},
+				},
+			}},
+			CreationContent: map[string]interface{}{
+				"type": event.RoomTypeSpace,
+			},
+			PowerLevelOverride: &event.PowerLevelsEventContent{
+				Users: map[id.UserID]int{
+					user.bridge.Bot.UserID: 9001,
+					user.MXID:              50,
+				},
+			},
+		})
+
+		if err != nil {
+			user.log.Err(err).Msg("Failed to auto-create space room")
+		} else {
+			user.SpaceRoom = resp.RoomID
+			err = user.Update(context.TODO())
+			if err != nil {
+				user.log.Err(err).Msg("Failed to save user in database after creating space room")
+			}
+			user.ensureInvited(ctx, user.bridge.Bot, user.SpaceRoom, false)
+		}
+	} else if !user.spaceMembershipChecked {
+		user.ensureInvited(ctx, user.bridge.Bot, user.SpaceRoom, false)
+	}
+	user.spaceMembershipChecked = true
+
+	return user.SpaceRoom
+}
+
+func (user *User) getDirectChats() map[id.UserID][]id.RoomID {
+	chats := map[id.UserID][]id.RoomID{}
+
+	privateChats, err := user.bridge.DB.Portal.FindPrivateChatsOf(context.TODO(), user.EmailAddress)
+	if err != nil {
+		user.log.Err(err).Msg("Failed to get private chats")
+		return chats
+	}
+	for _, portal := range privateChats {
+		portalEmailAddress := portal.EmailAddress
+		if portal.MXID != "" {
+			puppetMXID := user.bridge.FormatPuppetMXID(portalEmailAddress)
+
+			chats[puppetMXID] = []id.RoomID{portal.MXID}
+		}
+	}
+
+	return chats
 }
 
 func (br *MyBridge) GetAllLoggedInUsers() []*User {

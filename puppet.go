@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net/mail"
 	"regexp"
+	"strings"
 
 	"mybridge/database"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/appservice"
 	"maunium.net/go/mautrix/id"
 )
@@ -28,6 +31,16 @@ type Puppet struct {
 // CustomIntent implements bridge.Ghost.
 func (*Puppet) CustomIntent() *appservice.IntentAPI {
 	panic("unimplemented")
+}
+
+func (puppet *Puppet) IntentFor(portal *Portal) *appservice.IntentAPI {
+	if puppet != nil {
+		if puppet.customIntent == nil || portal.EmailAddress == puppet.EmailAddress {
+			return puppet.DefaultIntent()
+		}
+		return puppet.customIntent
+	}
+	return nil
 }
 
 // GetMXID implements bridge.Ghost.
@@ -185,4 +198,80 @@ func (br *MyBridge) dbPuppetsToPuppets(dbPuppets []*database.Puppet) []*Puppet {
 		output[index] = puppet
 	}
 	return output
+}
+
+func Format(addr string) string {
+	return strings.ReplaceAll(addr, "@", "_")
+
+}
+
+func (puppet *Puppet) UpdateInfo(ctx context.Context, source *User) {
+	var err error
+
+	log.Trace().Msg("Updating puppet info")
+
+	update := false
+	if puppet.EmailAddress != source.EmailAddress {
+		puppet.EmailAddress = source.EmailAddress
+		update = true
+	}
+	update = puppet.updateName(ctx, Format(puppet.EmailAddress)) || update
+	if update {
+		puppet.NameSet = false
+		puppet.UpdateContactInfo(ctx)
+		err = puppet.Update(ctx)
+		if err != nil {
+			log.Err(err).Msg("Failed to save puppet to database after updating")
+		}
+		go puppet.updatePortalMeta(ctx)
+		log.Debug().Msg("Puppet info updated")
+	}
+}
+
+func (puppet *Puppet) updateName(ctx context.Context, contact string) bool {
+	// TODO set name quality
+	newName := strings.ReplaceAll(contact, "@", "_")
+	if puppet.NameSet && puppet.Name == newName {
+		return false
+	}
+	puppet.Name = newName
+	puppet.NameSet = false
+	err := puppet.DefaultIntent().SetDisplayName(ctx, newName)
+	if err != nil {
+		zerolog.Ctx(ctx).Err(err).Msg("Failed to update user displayname")
+	} else {
+		puppet.NameSet = true
+	}
+	return true
+}
+
+func (puppet *Puppet) UpdateContactInfo(ctx context.Context) {
+	if !puppet.bridge.SpecVersions.Supports(mautrix.BeeperFeatureArbitraryProfileMeta) || puppet.NameSet {
+		return
+	}
+
+	identifiers := []string{
+		fmt.Sprintf("email:%s", puppet.EmailAddress),
+	}
+	contactInfo := map[string]any{
+		"com.beeper.bridge.identifiers": identifiers,
+		"com.beeper.bridge.remote_id":   puppet.EmailAddress,
+		"com.beeper.bridge.service":     "email",
+		"com.beeper.bridge.network":     "email",
+	}
+	err := puppet.DefaultIntent().BeeperUpdateProfile(ctx, contactInfo)
+	if err != nil {
+		zerolog.Ctx(ctx).Err(err).Msg("Failed to store custom contact info in profile")
+	} else {
+		puppet.NameSet = true
+	}
+}
+
+func (puppet *Puppet) updatePortalMeta(ctx context.Context) {
+	for _, portal := range puppet.bridge.FindPrivateChatPortalsWith(puppet.EmailAddress) {
+		// Get room create lock to prevent races between receiving contact info and room creation.
+		portal.roomCreateLock.Lock()
+		// portal.UpdateDMInfo(ctx, false)
+		portal.roomCreateLock.Unlock()
+	}
 }

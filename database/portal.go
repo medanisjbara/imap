@@ -15,6 +15,8 @@ const (
         FROM portal
     `
 	getAllPortalsWithMXIDQuery = portalBaseSelect + `WHERE mxid IS NOT NULL`
+	getPortalsByAddress        = portalBaseSelect + `WHERE email_address=$1`
+	getPortalsByReceiver       = portalBaseSelect + `WHERE receiver=$1`
 	insertPortalQuery          = `
         INSERT INTO portal (
             thread_id, receiver, mxid, name, email_address, topic, avatar_path, avatar_hash, avatar_url,
@@ -128,4 +130,12 @@ func (p *Portal) Delete(ctx context.Context) error {
 
 func (p *Portal) ReID(ctx context.Context, newID string) error {
 	return p.qh.Exec(ctx, reIDPortalQuery, p.ThreadID, newID, p.Receiver)
+}
+
+func (pq *PortalQuery) FindPrivateChatsWith(ctx context.Context, address string) ([]*Portal, error) {
+	return pq.QueryMany(ctx, getPortalsByAddress, address)
+}
+
+func (pq *PortalQuery) FindPrivateChatsOf(ctx context.Context, receiver string) ([]*Portal, error) {
+	return pq.QueryMany(ctx, getPortalsByReceiver, receiver)
 }

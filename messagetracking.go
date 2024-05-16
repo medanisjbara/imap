@@ -27,8 +27,6 @@ import (
 	"maunium.net/go/mautrix/bridge/status"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
-
-	"mybridge/msgconv"
 )
 
 var (
@@ -56,8 +54,8 @@ var (
 func errorToStatusReason(err error) (reason event.MessageStatusReason, status event.MessageStatus, isCertain, sendNotice bool, humanMessage string) {
 	switch {
 	case errors.Is(err, errUnexpectedParsedContentType),
-		errors.Is(err, msgconv.ErrUnsupportedMsgType),
-		errors.Is(err, msgconv.ErrInvalidGeoURI):
+		errors.Is(err, errors.New("ErrUnsupportedMsgType")),
+		errors.Is(err, errors.New("ErrInvalidGeoURI")):
 		return event.MessageStatusUnsupported, event.MessageStatusFail, true, true, ""
 	case errors.Is(err, errMNoticeDisabled):
 		return event.MessageStatusUnsupported, event.MessageStatusFail, true, false, ""
