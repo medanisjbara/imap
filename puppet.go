@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/mail"
 	"regexp"
 	"strings"
+
+	"github.com/emersion/go-message/mail"
 
 	"mybridge/database"
 

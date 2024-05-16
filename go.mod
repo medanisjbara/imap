@@ -5,14 +5,10 @@ go 1.22.2
 require (
 	github.com/MakMoinee/go-mith v1.2.10
 	github.com/emersion/go-message v0.18.1
-	github.com/emersion/go-vcard v0.0.0-20230815062825-8fda7d206ec9
-	github.com/google/uuid v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/rs/zerolog v1.32.0
 	go.mau.fi/util v0.4.2
-	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8
-	golang.org/x/net v0.25.0
 	maunium.net/go/mautrix v0.18.1
 )
 
@@ -29,6 +25,8 @@ require (
 	github.com/yuin/goldmark v1.7.1 // indirect
 	go.mau.fi/zeroconfig v0.1.2 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 // indirect
+	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
