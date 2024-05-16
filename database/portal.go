@@ -16,6 +16,7 @@ const (
     `
 	getAllPortalsWithMXIDQuery = portalBaseSelect + `WHERE mxid IS NOT NULL`
 	getPortalsByAddress        = portalBaseSelect + `WHERE email_address=$1`
+	getPortalsByThreadID       = portalBaseSelect + `WHERE thread_id=$1 AND receiver=$2`
 	getPortalsByReceiver       = portalBaseSelect + `WHERE receiver=$1`
 	insertPortalQuery          = `
         INSERT INTO portal (
@@ -60,6 +61,13 @@ type Portal struct {
 	Encrypted      bool
 	RelayUserID    id.UserID
 	ExpirationTime uint32
+}
+
+func NewPortalKey(threadID string, receiver string) PortalKey {
+	return PortalKey{
+		ThreadID: threadID,
+		Receiver: receiver,
+	}
 }
 
 func newPortal(qh *dbutil.QueryHelper[*Portal]) *Portal {
@@ -138,4 +146,8 @@ func (pq *PortalQuery) FindPrivateChatsWith(ctx context.Context, address string)
 
 func (pq *PortalQuery) FindPrivateChatsOf(ctx context.Context, receiver string) ([]*Portal, error) {
 	return pq.QueryMany(ctx, getPortalsByReceiver, receiver)
+}
+
+func (pq *PortalQuery) GetByThreadID(ctx context.Context, pk PortalKey) (*Portal, error) {
+	return pq.QueryOne(ctx, getPortalsByThreadID, pk.ThreadID, pk.Receiver)
 }

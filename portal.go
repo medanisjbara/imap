@@ -522,6 +522,10 @@ func (br *MyBridge) NewPortal(dbPortal *database.Portal) *Portal {
 	return portal
 }
 
+func (portal *Portal) ensureUserInvited(ctx context.Context, user *User) bool {
+	return user.ensureInvited(ctx, portal.MainIntent(), portal.MXID, portal.IsPrivateChat())
+}
+
 func (portal *Portal) CreateMatrixRoom(ctx context.Context, user *User, emailAddress string) error {
 	portal.roomCreateLock.Lock()
 	defer portal.roomCreateLock.Unlock()
@@ -652,4 +656,31 @@ func (br *MyBridge) FindPrivateChatPortalsWith(address string) []*Portal {
 		return nil
 	}
 	return portals
+}
+
+func (br *MyBridge) GetPortalByChatID(key database.PortalKey) *Portal {
+	br.portalsLock.Lock()
+	defer br.portalsLock.Unlock()
+	return br.unlockedGetPortalByChatID(key, true)
+}
+
+func (br *MyBridge) unlockedGetPortalByChatID(key database.PortalKey, createIfNotExists bool) *Portal {
+	portal, ok := br.portalsByID[key]
+	if !ok {
+		dbPortal, err := br.DB.Portal.GetByThreadID(context.TODO(), key)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to get portal from database")
+			return nil
+		}
+		keyIfNotExists := &key
+		if !createIfNotExists {
+			keyIfNotExists = nil
+		}
+		return br.loadPortal(context.TODO(), dbPortal, keyIfNotExists)
+	}
+	return portal
+}
+
+func (portal *Portal) UpdateDMInfo(ctx context.Context, forceSave bool) {
+	// FIXME
 }
