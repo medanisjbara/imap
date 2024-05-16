@@ -86,9 +86,11 @@ func (br *MyBridge) Stop() {
 }
 
 func (br *MyBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
-	// Implement your portal retrieval logic here
-	fmt.Println("Get Portal")
-	return nil
+	p := br.GetPortalByMXID(mxid)
+	if p == nil {
+		return nil
+	}
+	return p
 }
 
 func (br *MyBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
@@ -105,9 +107,11 @@ func (br *MyBridge) IsGhost(mxid id.UserID) bool {
 }
 
 func (br *MyBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
-	// Implement your ghost retrieval logic here
-	fmt.Println("Is I Ghost")
-	return nil
+	p := br.GetPuppetByMXID(mxid)
+	if p == nil {
+		return nil
+	}
+	return p
 }
 
 func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User, brGhost bridge.Ghost) {

@@ -15,9 +15,10 @@ const (
         FROM portal
     `
 	getAllPortalsWithMXIDQuery = portalBaseSelect + `WHERE mxid IS NOT NULL`
-	getPortalsByAddress        = portalBaseSelect + `WHERE email_address=$1`
-	getPortalsByThreadID       = portalBaseSelect + `WHERE thread_id=$1 AND receiver=$2`
-	getPortalsByReceiver       = portalBaseSelect + `WHERE receiver=$1`
+	getPortalsByAddressQuery   = portalBaseSelect + `WHERE email_address=$1`
+	getPortalsByThreadIDQuery  = portalBaseSelect + `WHERE thread_id=$1 AND receiver=$2`
+	getPortalByMXIDQuery       = portalBaseSelect + `WHERE mxid=$1`
+	getPortalsByReceiverQuery  = portalBaseSelect + `WHERE receiver=$1`
 	insertPortalQuery          = `
         INSERT INTO portal (
             thread_id, receiver, mxid, name, email_address, topic, avatar_path, avatar_hash, avatar_url,
@@ -140,14 +141,18 @@ func (p *Portal) ReID(ctx context.Context, newID string) error {
 	return p.qh.Exec(ctx, reIDPortalQuery, p.ThreadID, newID, p.Receiver)
 }
 
+func (pq *PortalQuery) GetByMXID(ctx context.Context, mxid id.RoomID) (*Portal, error) {
+	return pq.QueryOne(ctx, getPortalByMXIDQuery, mxid)
+}
+
 func (pq *PortalQuery) FindPrivateChatsWith(ctx context.Context, address string) ([]*Portal, error) {
-	return pq.QueryMany(ctx, getPortalsByAddress, address)
+	return pq.QueryMany(ctx, getPortalsByAddressQuery, address)
 }
 
 func (pq *PortalQuery) FindPrivateChatsOf(ctx context.Context, receiver string) ([]*Portal, error) {
-	return pq.QueryMany(ctx, getPortalsByReceiver, receiver)
+	return pq.QueryMany(ctx, getPortalsByReceiverQuery, receiver)
 }
 
 func (pq *PortalQuery) GetByThreadID(ctx context.Context, pk PortalKey) (*Portal, error) {
-	return pq.QueryOne(ctx, getPortalsByThreadID, pk.ThreadID, pk.Receiver)
+	return pq.QueryOne(ctx, getPortalsByThreadIDQuery, pk.ThreadID, pk.Receiver)
 }

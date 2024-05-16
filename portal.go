@@ -22,6 +22,23 @@ import (
 	"mybridge/database"
 )
 
+func (br *MyBridge) GetPortalByMXID(mxid id.RoomID) *Portal {
+	br.portalsLock.Lock()
+	defer br.portalsLock.Unlock()
+
+	portal, ok := br.portalsByMXID[mxid]
+	if !ok {
+		dbPortal, err := br.DB.Portal.GetByMXID(context.TODO(), mxid)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to get portal from database")
+			return nil
+		}
+		return br.loadPortal(context.TODO(), dbPortal, nil)
+	}
+
+	return portal
+}
+
 type msgconvContextKey int
 
 const (
