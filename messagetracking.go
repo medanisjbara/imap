@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	errUserNotConnected            = errors.New("you are not connected to MyBridge")
+	errUserNotConnected            = errors.New("you are not connected to IMAPBridge")
 	errDifferentUser               = errors.New("user is not the recipient of this private chat portal")
 	errUserNotLoggedIn             = errors.New("user is not logged in and chat has no relay bot")
 	errRelaybotNotLoggedIn         = errors.New("neither user nor relay bot of chat are logged in")

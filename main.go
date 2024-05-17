@@ -15,8 +15,8 @@ import (
 	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
 
-	"mybridge/config"
-	"mybridge/database"
+	"imap-bridge/config"
+	"imap-bridge/database"
 )
 
 //go:embed example-config.yaml
@@ -28,7 +28,7 @@ var (
 	BuildTime = "unknown"
 )
 
-type MyBridge struct {
+type IMAPBridge struct {
 	bridge.Bridge
 
 	Config *config.Config
@@ -50,13 +50,13 @@ type MyBridge struct {
 	puppetsLock         sync.Mutex
 }
 
-var _ bridge.ChildOverride = (*MyBridge)(nil)
+var _ bridge.ChildOverride = (*IMAPBridge)(nil)
 
-func (br *MyBridge) GetExampleConfig() string {
+func (br *IMAPBridge) GetExampleConfig() string {
 	return ExampleConfig
 }
 
-func (br *MyBridge) GetConfigPtr() interface{} {
+func (br *IMAPBridge) GetConfigPtr() interface{} {
 	br.Config = &config.Config{
 		BaseConfig: &br.Bridge.Config,
 	}
@@ -64,7 +64,7 @@ func (br *MyBridge) GetConfigPtr() interface{} {
 	return br.Config
 }
 
-func (br *MyBridge) Init() {
+func (br *IMAPBridge) Init() {
 	br.DB = database.New(br.Bridge.DB)
 
 	br.CommandProcessor = commands.NewProcessor(&br.Bridge)
@@ -76,16 +76,16 @@ func (br *MyBridge) Init() {
 	}
 }
 
-func (br *MyBridge) Start() {
+func (br *IMAPBridge) Start() {
 	go br.StartUsers()
 }
 
-func (br *MyBridge) Stop() {
+func (br *IMAPBridge) Stop() {
 	// Stop your bridge here
 	fmt.Println("Stop")
 }
 
-func (br *MyBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
+func (br *IMAPBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
 	p := br.GetPortalByMXID(mxid)
 	if p == nil {
 		return nil
@@ -93,7 +93,7 @@ func (br *MyBridge) GetIPortal(mxid id.RoomID) bridge.Portal {
 	return p
 }
 
-func (br *MyBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
+func (br *IMAPBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
 	p := br.GetUserByMXID(mxid)
 	if p == nil {
 		return nil
@@ -101,12 +101,12 @@ func (br *MyBridge) GetIUser(mxid id.UserID, create bool) bridge.User {
 	return p
 }
 
-func (br *MyBridge) IsGhost(mxid id.UserID) bool {
+func (br *IMAPBridge) IsGhost(mxid id.UserID) bool {
 	_, isGhost := br.ParsePuppetMXID(mxid)
 	return isGhost
 }
 
-func (br *MyBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
+func (br *IMAPBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
 	p := br.GetPuppetByMXID(mxid)
 	if p == nil {
 		return nil
@@ -114,7 +114,7 @@ func (br *MyBridge) GetIGhost(mxid id.UserID) bridge.Ghost {
 	return p
 }
 
-func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User, brGhost bridge.Ghost) {
+func (br *IMAPBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User, brGhost bridge.Ghost) {
 	inviter := brInviter.(*User)
 	puppet := brGhost.(*Puppet)
 
@@ -152,7 +152,7 @@ func (br *MyBridge) CreatePrivatePortal(roomID id.RoomID, brInviter bridge.User,
 	_, _ = intent.LeaveRoom(ctx, roomID)
 }
 
-func (br *MyBridge) createPrivatePortalFromInvite(ctx context.Context, roomID id.RoomID, inviter *User, puppet *Puppet, portal *Portal) {
+func (br *IMAPBridge) createPrivatePortalFromInvite(ctx context.Context, roomID id.RoomID, inviter *User, puppet *Puppet, portal *Portal) {
 	log := zerolog.Ctx(ctx)
 	log.Debug().Msg("Creating private portal from invite")
 
@@ -198,7 +198,7 @@ func (br *MyBridge) createPrivatePortalFromInvite(ctx context.Context, roomID id
 }
 
 func main() {
-	br := &MyBridge{
+	br := &IMAPBridge{
 		usersByMXID:         make(map[id.UserID]*User),
 		usersByEmailAddress: make(map[string]*User),
 
@@ -208,7 +208,7 @@ func main() {
 		portalsByID:   make(map[database.PortalKey]*Portal),
 	}
 	br.Bridge = bridge.Bridge{
-		Name:        "mybridge",
+		Name:        "imap-bridge",
 		Description: "Your bridge description here.",
 		Version:     "0.1.0",
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"mybridge/database"
-	"mybridge/pkg/emailmeow"
+	"imap-bridge/database"
+	"imap-bridge/pkg/emailmeow"
 
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/rs/zerolog"
@@ -26,7 +26,7 @@ type User struct {
 
 	sync.Mutex
 
-	bridge *MyBridge
+	bridge *IMAPBridge
 	log    zerolog.Logger
 
 	Admin           bool
@@ -49,15 +49,15 @@ func (user *User) GetRemoteName() string {
 	return user.EmailAddress
 }
 
-func (br *MyBridge) GetUserByMXID(userID id.UserID) *User {
+func (br *IMAPBridge) GetUserByMXID(userID id.UserID) *User {
 	return br.maybeGetUserByMXID(userID, &userID)
 }
 
-func (br *MyBridge) GetUserByMXIDIfExists(userID id.UserID) *User {
+func (br *IMAPBridge) GetUserByMXIDIfExists(userID id.UserID) *User {
 	return br.maybeGetUserByMXID(userID, nil)
 }
 
-func (br *MyBridge) maybeGetUserByMXID(userID id.UserID, userIDPtr *id.UserID) *User {
+func (br *IMAPBridge) maybeGetUserByMXID(userID id.UserID, userIDPtr *id.UserID) *User {
 	if userID == br.Bot.UserID || br.IsGhost(userID) {
 		return nil
 	}
@@ -379,7 +379,7 @@ func (user *User) Login(ctx context.Context, address string, password string) (s
 	return "Login successful", nil
 }
 
-func (br *MyBridge) GetAllLoggedInUsers() []*User {
+func (br *IMAPBridge) GetAllLoggedInUsers() []*User {
 	br.usersLock.Lock()
 	defer br.usersLock.Unlock()
 
@@ -400,7 +400,7 @@ func (br *MyBridge) GetAllLoggedInUsers() []*User {
 	return users
 }
 
-func (br *MyBridge) StartUsers() {
+func (br *IMAPBridge) StartUsers() {
 	br.ZLog.Debug().Msg("Starting users")
 
 	usersWithToken := br.GetAllLoggedInUsers()
@@ -423,7 +423,7 @@ func (br *MyBridge) StartUsers() {
 	}
 }
 
-func (br *MyBridge) loadUser(ctx context.Context, dbUser *database.User, mxid *id.UserID) *User {
+func (br *IMAPBridge) loadUser(ctx context.Context, dbUser *database.User, mxid *id.UserID) *User {
 	if dbUser == nil {
 		if mxid == nil {
 			return nil
@@ -451,7 +451,7 @@ func (br *MyBridge) loadUser(ctx context.Context, dbUser *database.User, mxid *i
 	return user
 }
 
-func (br *MyBridge) NewUser(dbUser *database.User) *User {
+func (br *IMAPBridge) NewUser(dbUser *database.User) *User {
 	user := &User{
 		User:   dbUser,
 		bridge: br,

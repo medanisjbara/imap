@@ -8,7 +8,7 @@ import (
 
 	"github.com/emersion/go-message/mail"
 
-	"mybridge/database"
+	"imap-bridge/database"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -20,7 +20,7 @@ import (
 type Puppet struct {
 	*database.Puppet
 
-	bridge *MyBridge
+	bridge *IMAPBridge
 	log    zerolog.Logger
 
 	MXID id.UserID
@@ -54,7 +54,7 @@ func (puppet *Puppet) DefaultIntent() *appservice.IntentAPI {
 }
 
 // Bridge functions
-func (br *MyBridge) GetPuppetByMXID(mxid id.UserID) *Puppet {
+func (br *IMAPBridge) GetPuppetByMXID(mxid id.UserID) *Puppet {
 	emailAddr, ok := br.ParsePuppetMXID(mxid)
 	if !ok {
 		return nil
@@ -63,7 +63,7 @@ func (br *MyBridge) GetPuppetByMXID(mxid id.UserID) *Puppet {
 	return br.GetPuppetByEmailAddress(emailAddr)
 }
 
-func (br *MyBridge) GetPuppetByEmailAddress(addr string) *Puppet {
+func (br *IMAPBridge) GetPuppetByEmailAddress(addr string) *Puppet {
 	// FIXME
 	if addr == "" {
 		br.ZLog.Warn().Msg("Trying to get puppet with empty email_address")
@@ -85,7 +85,7 @@ func (br *MyBridge) GetPuppetByEmailAddress(addr string) *Puppet {
 	return puppet
 }
 
-func (br *MyBridge) NewPuppet(dbPuppet *database.Puppet) *Puppet {
+func (br *IMAPBridge) NewPuppet(dbPuppet *database.Puppet) *Puppet {
 	return &Puppet{
 		Puppet: dbPuppet,
 		bridge: br,
@@ -95,7 +95,7 @@ func (br *MyBridge) NewPuppet(dbPuppet *database.Puppet) *Puppet {
 	}
 }
 
-func (br *MyBridge) FormatPuppetMXID(emailAddr string) id.UserID {
+func (br *IMAPBridge) FormatPuppetMXID(emailAddr string) id.UserID {
 	return id.NewUserID(
 		br.Config.Bridge.FormatUsername(emailAddr),
 		br.Config.Homeserver.Domain,
@@ -109,7 +109,7 @@ func ParseFromRFC5322(addrr string) (string, error) {
 	return "Barry Gibbs <bg@example.com>", nil
 }
 
-func (br *MyBridge) ParsePuppetMXID(mxid id.UserID) (string, bool) {
+func (br *IMAPBridge) ParsePuppetMXID(mxid id.UserID) (string, bool) {
 	if userIDRegex == nil {
 		pattern := fmt.Sprintf(
 			"^@%s:%s$",
@@ -136,7 +136,7 @@ func (br *MyBridge) ParsePuppetMXID(mxid id.UserID) (string, bool) {
 	return "", false
 }
 
-func (br *MyBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, email string) *Puppet {
+func (br *IMAPBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, email string) *Puppet {
 	if dbPuppet == nil {
 		if email == "" {
 			return nil
@@ -158,7 +158,7 @@ func (br *MyBridge) loadPuppet(ctx context.Context, dbPuppet *database.Puppet, e
 	return puppet
 }
 
-func (br *MyBridge) GetPuppetByCustomMXID(mxid id.UserID) *Puppet {
+func (br *IMAPBridge) GetPuppetByCustomMXID(mxid id.UserID) *Puppet {
 	br.puppetsLock.Lock()
 	defer br.puppetsLock.Unlock()
 
@@ -174,7 +174,7 @@ func (br *MyBridge) GetPuppetByCustomMXID(mxid id.UserID) *Puppet {
 	return puppet
 }
 
-func (br *MyBridge) GetAllPuppetsWithCustomMXID() []*Puppet {
+func (br *IMAPBridge) GetAllPuppetsWithCustomMXID() []*Puppet {
 	puppets, err := br.DB.Puppet.GetAllWithCustomMXID(context.TODO())
 	if err != nil {
 		br.ZLog.Error().Err(err).Msg("Failed to get all puppets with custom MXID")
@@ -183,7 +183,7 @@ func (br *MyBridge) GetAllPuppetsWithCustomMXID() []*Puppet {
 	return br.dbPuppetsToPuppets(puppets)
 }
 
-func (br *MyBridge) dbPuppetsToPuppets(dbPuppets []*database.Puppet) []*Puppet {
+func (br *IMAPBridge) dbPuppetsToPuppets(dbPuppets []*database.Puppet) []*Puppet {
 	br.puppetsLock.Lock()
 	defer br.puppetsLock.Unlock()
 

@@ -9,7 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/util/dbutil"
 
-	"mybridge/database/upgrades"
+	"imap-bridge/database/upgrades"
 )
 
 type Database struct {

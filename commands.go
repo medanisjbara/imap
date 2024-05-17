@@ -8,12 +8,12 @@ import (
 
 type WrappedCommandEvent struct {
 	*commands.Event
-	Bridge *MyBridge
+	Bridge *IMAPBridge
 	User   *User
 	Portal *Portal
 }
 
-func (br *MyBridge) RegisterCommands() {
+func (br *IMAPBridge) RegisterCommands() {
 	proc := br.CommandProcessor.(*commands.Processor)
 	proc.AddHandlers(
 		cmdPing,
@@ -28,7 +28,7 @@ func wrapCommand(handler func(*WrappedCommandEvent)) func(*commands.Event) {
 		if ce.Portal != nil {
 			portal = ce.Portal.(*Portal)
 		}
-		br := ce.Bridge.Child.(*MyBridge)
+		br := ce.Bridge.Child.(*IMAPBridge)
 		handler(&WrappedCommandEvent{ce, br, user, portal})
 	}
 }
