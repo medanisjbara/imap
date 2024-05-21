@@ -222,5 +222,7 @@ func main() {
 	}
 	br.InitVersion(Tag, Commit, BuildTime)
 
+	br.StartDummyPortalCreation()
+
 	br.Main()
 }

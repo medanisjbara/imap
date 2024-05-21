@@ -78,7 +78,7 @@ func (portal *Portal) IsEncrypted() bool {
 
 func (portal *Portal) IsPrivateChat() bool {
 	// FIXME
-	return false
+	return true
 }
 
 func (portal *Portal) MainIntent() *appservice.IntentAPI {

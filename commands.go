@@ -57,6 +57,8 @@ func fnLogin(ce *WrappedCommandEvent) {
 	reply, err := user.Login(ce.Ctx, ce.Args[0], strings.Join(ce.Args[1:], " "))
 	if err != nil {
 		ce.Reply(reply)
+		ce.Reply("%s", err)
+		ce.User.log.Err(err).Msg("Couldn't login")
 		return
 	}
 

@@ -364,7 +364,7 @@ func (user *User) Login(ctx context.Context, address string, password string) (s
 	user.EmailAddress = address
 	user.Password = password
 	mailClient := emailmeow.NewClient(address, password)
-	err := mailClient.Login(ctx, address, password)
+	err := mailClient.Login(ctx)
 	if err != nil {
 		return "Couldn't login check logs", err
 	}
@@ -469,4 +469,23 @@ func (user *User) GetPortalByThreadID(address string) *Portal {
 		ThreadID: address,
 		Receiver: address,
 	})
+}
+
+func (br *IMAPBridge) unlockedGetUserEmailAddress(email string) *User {
+	user, ok := br.usersByEmailAddress[email]
+	if !ok {
+		dbUser, err := br.DB.User.GetByEmailAddress(context.TODO(), email)
+		if err != nil {
+			br.ZLog.Err(err).Msg("Failed to get user from database")
+			return nil
+		}
+		return br.loadUser(context.TODO(), dbUser, nil)
+	}
+	return user
+}
+
+func (br *IMAPBridge) GetUserByEmailAddress(email string) *User {
+	br.usersLock.Lock()
+	defer br.usersLock.Unlock()
+	return br.unlockedGetUserEmailAddress(email)
 }

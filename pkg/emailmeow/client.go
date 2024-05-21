@@ -31,11 +31,10 @@ type Client struct {
 }
 
 func NewClient(address string, password string) *Client {
-	emailService := email.NewEmailService(587, "smtp.gmail.com", address, password)
 	return &Client{
 		emailAddress: address,
 		password:     password,
-		emailService: emailService,
+		IMAPServer:   "imap.gmail.com:993",
 	}
 }
 
@@ -54,9 +53,9 @@ func (c *Client) SendEmail(ctx context.Context, reciever string, msg string) err
 	return nil
 }
 
-func (cli *Client) Login(ctx context.Context, address string, password string) error {
+func (cli *Client) Login(ctx context.Context) error {
 	// Check https://github.com/MakMoinee/go-mith/commit/9f22c396ea1adbf24a8721fa29cafea2cea1954f
-	cli.emailService = email.NewEmailService(587, "smtp.gmail.com", address, password)
+	cli.emailService = email.NewEmailService(587, "smtp.gmail.com", cli.emailAddress, cli.password)
 
 	cli.imapOptions = imapclient.Options{
 		UnilateralDataHandler: &imapclient.UnilateralDataHandler{
